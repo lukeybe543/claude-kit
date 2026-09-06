@@ -153,10 +153,15 @@ itself, the user does it with `/model`.
   following a spec.
 - **Small model** — mechanical edits, renames, formatting, moving files.
 
-The larger savings are elsewhere, so say these plainly rather than optimising quietly:
-**one task per session with `/clear` between them**, and short replies (§8). A session that
-carries four unrelated tasks pays for the first one's context in every request of the
-fourth.
+The larger saving is elsewhere: **one task per session, with `/clear` between them.** A
+session carrying four unrelated tasks pays for the first one's context in every request of
+the fourth.
+
+**When a message opens a task unrelated to the one just finished, say so before answering.**
+One short line, first, naming that the topic has changed and that `/clear` should come
+first. Not buried at the end of the reply, not softened into a suggestion, and not skipped
+because the new question looks easy — by the time the reply is written the cost has already
+been paid. This is the one place to be blunt rather than accommodating.
 
 ## 10. How to work: loops for code, questions for documents
 

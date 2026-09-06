@@ -96,6 +96,21 @@ ones are disciplines the model reaches for on its own.
 | `guard` | model | Proves a test actually bites, by breaking the thing minimally and watching it fail. Two hard-won lessons about tests that pass for the wrong reason. |
 | `drift` | model | Finds claims in the docs that a change quietly made false. |
 | `tangent` | model | Parks a thought raised mid-task, then asks which thread to pull. |
+| `session-log` | user | Writes down what a session learned before it is cleared — what worked, what was tried and failed, what is untried. Run before `/clear`. |
+
+## The agents — `agents/`
+
+Two, both narrow, because a subagent starts cold and re-derives context — it only pays
+where the input is large and the answer is small.
+
+| Agent | Model | Why it exists |
+| :--- | :--- | :--- |
+| `scout` | haiku | Read-only search. Reads a great many lines so that three of them land in your session instead of all of them. |
+| `reviewer` | sonnet | Reviews a change **without having seen the reasoning that produced it**. The missing context is the value: a reviewer who did not build it cannot be reassured by its author's intent. |
+
+The `model:` in each agent's frontmatter is the part worth noticing. It delegates cheap
+work to a cheap model permanently, with nobody having to remember to switch — unlike
+`/model`, which only the user can drive.
 
 `commands/check.md` is a template for the project's own verification command.
 

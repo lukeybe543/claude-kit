@@ -97,6 +97,8 @@ def _install_governance(target, report):
               target / ".claude" / "skills" / skill.name / "SKILL.md", False, report)
     for command in sorted((HERE / "commands").glob("*.md")):
         _copy(command, target / ".claude" / "commands" / command.name, False, report)
+    for agent in sorted((HERE / "agents").glob("*.md")):
+        _copy(agent, target / ".claude" / "agents" / agent.name, False, report)
     _install_permissions(target, report)
 
 
