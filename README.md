@@ -114,6 +114,31 @@ work to a cheap model permanently, with nobody having to remember to switch — 
 
 `commands/check.md` is a template for the project's own verification command.
 
+## Structural search — `ast-grep`
+
+For efficient searching on Linux: token overhead from grep's false-positives (textual
+matches in comments, strings, wrong syntactic context) accumulates on every turn. Use
+[ast-grep](https://github.com/ast-grep/ast-grep) instead to query code by structure, via
+tree-sitter: "find calls to X inside a try block" returns exactly that, not every textual
+hit.
+
+No cloud dependency, no API key, no daemon — works offline as a single Rust binary once
+installed.
+
+```bash
+cargo install ast-grep --locked
+npx skills add ast-grep/agent-skill
+```
+
+The skill is optional and adds itself globally to Claude Code (same mechanism as any
+plugin); this kit does not provision or configure it, so there are no changes needed to
+`governance/permissions.json` or `agents/scout.md`.
+
+For usage and query syntax, see [ast-grep's own docs](https://ast-grep.github.io/guide/introduction.html)
+and the [Claude Code plugin source](https://github.com/ast-grep/agent-skill).
+
+---
+
 `governance/permissions.json` is a settings baseline: safe, reversible commands run
 without a prompt so code can be written in a loop; anything that installs, deletes,
 changes permissions or reaches the network asks; destructive commands and credential files
