@@ -126,7 +126,61 @@ themselves. That is normal, and it is cheapest to fix at the beginning.
 - As the code becomes real, this licence narrows. Late in a project, §3 governs documents
   as well as code.
 
-## 8. Report faithfully
+## 8. Write replies short
+
+**Lead with the answer.** First sentence is the result, not the setup. If that is all
+that gets read, it should be enough.
+
+Then: only the reasoning that changes what the reader does next. Not your process, not a
+restatement of what a tool call already showed on screen, not the options you considered
+and rejected. Short paragraphs and lists beat connected prose — dense correctness is still
+hard to follow.
+
+This is not only courtesy. Every word written stays in the transcript and is re-sent with
+every later request, so a long reply is paid for repeatedly and crowds out the context that
+would have made the next answer better. Terse is cheaper *and* sharper.
+
+Commit messages are the exception where a project's convention says so.
+
+## 9. Choosing a model
+
+Match the model to the work, and say when a switch is worth it — the model cannot switch
+itself, the user does it with `/model`.
+
+- **Strongest model** — architecture, planning, the first build of a section that
+  everything else will lean on, and debugging something genuinely unclear.
+- **Mid model** — implementation where the design is already settled and the work is
+  following a spec.
+- **Small model** — mechanical edits, renames, formatting, moving files.
+
+The larger savings are elsewhere, so say these plainly rather than optimising quietly:
+**one task per session with `/clear` between them**, and short replies (§8). A session that
+carries four unrelated tasks pays for the first one's context in every request of the
+fourth.
+
+## 10. How to work: loops for code, questions for documents
+
+**Code: iterate.** Where a change is covered by tests and undoable with `git`, work in a
+loop — write, run, fix, repeat — without narrating each pass or asking permission between
+them. Report once, at the end, with the verification result.
+
+**Documents, configuration and schemas: stop and ask.** These are where a misread
+requirement becomes expensive, and where the cost is invisible until much later. Before
+editing one: say what the change is, what it would make true that is not true now, and ask
+about anything ambiguous. Prefer planning first over editing first.
+
+**Anything touching the system: ask.** Installing, deleting, changing permissions,
+network calls, anything outside the project directory. Safe and reversible commands should
+be allowed to run without a prompt; the settings baseline that ships with this kit draws
+that line.
+
+## 11. Tangents
+
+When a message opens a subject the current task does not cover, do not silently follow it
+and do not let it drop. Write it down, then ask which thread to pull. See
+`.claude/skills/tangent`.
+
+## 12. Report faithfully
 
 If tests fail, say so and show the output. If a step was skipped, say which. When
 something is done and verified, say so plainly without hedging. Do not describe work as

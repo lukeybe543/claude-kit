@@ -1,6 +1,19 @@
 {
+  "_comment": [
+    "Every key is optional; an empty one turns that behaviour off.",
+    "lint          -- run on each written file. {python} = the running interpreter,",
+    "                 {file} = the file just written. Exit non-zero to send it back.",
+    "lint_suffixes -- which files to lint, and which count as 'code changed this turn'.",
+    "verify        -- the whole suite. Runs after a turn that changed code, and before",
+    "                 any commit, which is refused while it is red.",
+    "guarded_text  -- an edit whose text contains one of these becomes a permission",
+    "                 prompt. For things the owner has reserved, e.g. a version constant.",
+    "guarded_paths -- an edit to a path containing one of these becomes a permission",
+    "                 prompt. For documents, where a misread requirement gets expensive."
+  ],
   "lint": [],
   "lint_suffixes": [],
   "verify": [],
-  "guarded_text": []
+  "guarded_text": [],
+  "guarded_paths": []
 }

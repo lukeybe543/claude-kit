@@ -78,11 +78,32 @@ pushback lands where it helps.
   is advisory: push back once, before building, with evidence. **Unassigned is Tier 1, and
   the assistant may only ever *propose* a tier, never assign one** — without that rule,
   *"that's just an implementation detail"* becomes a way to overrule a real decision.
-- **`skills/charter`** — the start-of-project interview that fills the registry. It
-  interviews rather than drafting, because a list the owner did not build is a list the
-  owner has not agreed to.
-- **`skills/audit-absolutes`** — finds every "must", "never", "always" and "only" in the
-  specification and asks, once and early, which are promises and which were emphasis.
+CLAUDE.md also carries four rules about *how the work runs*: replies stay short (§8, and
+it is a context cost, not just a courtesy); the model is matched to the task (§9); code is
+written in loops while documents get questions first (§10); and tangents are parked rather
+than followed or dropped (§11).
+
+## The skills — `skills/`
+
+Split the way Matt Pocock splits his: **user-invoked** ones orchestrate, **model-invoked**
+ones are disciplines the model reaches for on its own.
+
+| Skill | | What it does |
+| :--- | :--- | :--- |
+| `charter` | user | The start-of-project interview that fills the tier registry. Interviews rather than drafting — a list the owner did not build is a list they have not agreed to. |
+| `audit-absolutes` | user | Finds every "must", "never", "always" and "only", and asks once, early, which are promises and which were emphasis. |
+| `stress` | user | Presses a high-level design for practicality. Three verdicts, one of which is **build it and find out**. Reports; never edits. |
+| `guard` | model | Proves a test actually bites, by breaking the thing minimally and watching it fail. Two hard-won lessons about tests that pass for the wrong reason. |
+| `drift` | model | Finds claims in the docs that a change quietly made false. |
+| `tangent` | model | Parks a thought raised mid-task, then asks which thread to pull. |
+
+`commands/check.md` is a template for the project's own verification command.
+
+`governance/permissions.json` is a settings baseline: safe, reversible commands run
+without a prompt so code can be written in a loop; anything that installs, deletes,
+changes permissions or reaches the network asks; destructive commands and credential files
+are denied outright. `defaultMode` is `acceptEdits`, because file edits are covered by
+tests and undone with `git`.
 
 The load-bearing ideas, if you read nothing else:
 

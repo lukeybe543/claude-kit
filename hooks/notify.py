@@ -209,22 +209,35 @@ def turn_start():
 
 
 def guard_edit():
-    """Hold an edit that touches text the project has reserved for its owner."""
-    guarded = _config().get("guarded_text") or []
-    if not guarded:
+    """Hold an edit that touches something the project has reserved for its owner."""
+    config = _config()
+    guarded_text = config.get("guarded_text") or []
+    guarded_paths = config.get("guarded_paths") or []
+    if not guarded_text and not guarded_paths:
         return 0
+
     payload = json.load(sys.stdin)
-    written = json.dumps(payload.get("tool_input") or {})
-    hit = next((word for word in guarded if word in written), None)
-    if not hit:
+    tool_input = payload.get("tool_input") or {}
+    path = (tool_input.get("file_path") or "").replace("\\", "/")
+
+    reason = None
+    folder = next((p for p in guarded_paths if p in path), None)
+    if folder:
+        reason = ("This edits " + folder + ", which the project treats as a document to be "
+                  "changed deliberately. Say what the change is and why before making it -- "
+                  "and if the wording carries a requirement, clarify it first.")
+    else:
+        word = next((w for w in guarded_text if w in json.dumps(tool_input)), None)
+        if word:
+            reason = ("This edit touches " + word + ", which docs/tiers.md places in "
+                      "Tier 1 -- settled, and the owner's call rather than Claude's.")
+    if not reason:
         return 0
+
     print(json.dumps({"hookSpecificOutput": {
         "hookEventName": "PreToolUse",
         "permissionDecision": "ask",
-        "permissionDecisionReason": (
-            "This edit touches " + hit + ", which docs/tiers.md places in Tier 1 -- "
-            "settled, and the owner's call rather than Claude's."
-        ),
+        "permissionDecisionReason": reason,
     }}))
     return 0
 
