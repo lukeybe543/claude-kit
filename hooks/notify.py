@@ -16,6 +16,7 @@ able to stop a session.
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -317,13 +318,27 @@ def turn_end():
     return 0
 
 
+_COMMIT = re.compile(r"\bgit\b.*\bcommit\b")
+_SEGMENTS = re.compile(r"&&|\|\||;|\|")
+
+
+def _is_commit(command):
+    """True when the command really runs `git commit`, however it is dressed up.
+
+    Looking for the literal "git commit" misses `git -c user.name=... commit`,
+    which is how a commit is usually made from a script; looking for both words
+    anywhere matches `echo commit && git log`. Split on shell separators and
+    require both words, in that order, inside a single segment.
+    """
+    return any(_COMMIT.search(part) for part in _SEGMENTS.split(command))
+
+
 def commit_gate():
     """Refuse a commit while verification is red."""
     payload = json.load(sys.stdin)
-    # settings.json narrows this hook to commits already, but a gate that ran the
-    # whole suite on every shell command would be unbearable, so the check is
-    # repeated here where it cannot be lost in a settings edit.
-    if "git commit" not in ((payload.get("tool_input") or {}).get("command") or ""):
+    # A settings-level filter cannot see through `cd x && git -c ... commit`, so the
+    # check is made here, on the real command, where it cannot be lost.
+    if not _is_commit((payload.get("tool_input") or {}).get("command") or ""):
         return 0
 
     result = _run_verify()
@@ -381,6 +396,24 @@ def session_start():
 # Export
 # ---------------------------------------------------------------------------
 
+def selftest():
+    """Check the parts that have no other way of telling you they are broken."""
+    commits = ["git commit -m x", "cd /tmp && git commit -m x",
+               "git -c user.name=a -c user.email=b commit -q -F -",
+               "git add -A && git -c user.name=a commit -m x"]
+    not_commits = ["git log --oneline", "echo commit && git log", "ls -la",
+                   "python notify.py commit-gate"]
+    for command in commits:
+        assert _is_commit(command), "should gate: " + command
+    for command in not_commits:
+        assert not _is_commit(command), "should not gate: " + command
+    missing = [name for name, path in SOUNDS.items() if not Path(path).is_file()]
+    print("commit detection: " + str(len(commits) + len(not_commits)) + " cases pass")
+    print("sounds missing: " + (", ".join(missing) if missing else "none"))
+    print("bash for verification: " + str(_bash()))
+    return 0
+
+
 def install():
     """Copy these hooks into another project, settings and all."""
     target = Path(sys.argv[2]).expanduser().resolve()
@@ -431,6 +464,7 @@ COMMANDS = {
     "after-edit": after_edit,
     "turn-end": turn_end,
     "commit-gate": commit_gate,
+    "selftest": selftest,
     "compacting": compacting,
     "session-start": session_start,
     "install": install,
