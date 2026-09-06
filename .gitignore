@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+
+# Scratch state kept by the hooks, when the kit is used on itself.
+.claude/state/
