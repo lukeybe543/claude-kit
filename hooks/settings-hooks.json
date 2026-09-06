@@ -81,7 +81,6 @@
         "hooks": [
           {
             "type": "command",
-            "if": "Bash(git commit:*)",
             "command": "python .claude/hooks/notify.py commit-gate",
             "timeout": 300,
             "statusMessage": "Verifying before the commit"
