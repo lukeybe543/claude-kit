@@ -12,7 +12,8 @@ do, derived from the large ones and never replacing them.
 
 ## The two artifacts
 
-**`NEXT.md` at the repo root — the worktop note.** One screen. Three parts:
+**`NEXT.md` at the repo root — the worktop note.** Kept short — roughly one screen, and
+the activity log is the first thing to trim. Four parts:
 
 1. **Where the build is** — three or four bullets, current state only.
 2. **The next moves, in order** — the next handful of concrete steps, smallest first.
@@ -20,6 +21,9 @@ do, derived from the large ones and never replacing them.
    focusing yet — cut it to what genuinely comes next.
 3. **Blocking decisions right now** — the two to five open questions actually in the way
    of the next moves, each one line, pointing at the queue for detail.
+4. **Recent activity** — a short dated log, newest first, of what changed since the last
+   refresh. Trim to the last few weeks; the git log holds the rest. On a refresh run,
+   keep the existing entries and add one for this pass.
 
 It opens by saying what it is: a worktop note, **not a source of truth**, derived from the
 plan and the design doc, to be checked against them. Without that line it becomes a fourth
