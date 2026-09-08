@@ -10,7 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 1. **Audible feedback** — `notify.py` implements Claude Code hooks that ring when Claude needs attention, ding at turn boundaries, speak verification results, and catch errors before commits.
 2. **Governance framework** — `governance/CLAUDE.md` and `governance/tiers.md` help projects distinguish settled decisions from advisory ones, and `governance/permissions.json` establishes safe permission defaults.
-3. **Skills** — user-invoked (`charter`, `audit-absolutes`, `stress`, `session-log`) and model-invoked (`guard`, `drift`, `tangent`) discipline the conversation without requiring constant invocation.
+3. **Skills** — user-invoked (`charter`, `audit-absolutes`, `stress`, `focus`, `session-log`) and model-invoked (`guard`, `drift`, `tangent`) discipline the conversation without requiring constant invocation.
 4. **Agents** — narrow agents (`scout` for searching, `reviewer` for independent review) delegate to cheaper models to keep context lean.
 
 The toolkit is installed via `python install.py /path/to/target-project`. Nothing in the target project is overwritten except `notify.py` (versioned code); everything meant to be edited locally (`CLAUDE.md`, `tiers.md`, skills, config) is written once and left alone.
@@ -43,6 +43,7 @@ skills/          User and model-invoked disciplines
   guard/         Verify tests bite by breaking the code
   drift/         Find docs contradicted by recent changes
   tangent/       Park thoughts raised mid-task
+  focus/         Distil the big docs into a one-screen NEXT.md and a decisions queue
   session-log/   Record what a session learned
 
 install.py       Script that copies everything into a target project

@@ -93,6 +93,7 @@ ones are disciplines the model reaches for on its own.
 | `charter` | user | The start-of-project interview that fills the tier registry. Interviews rather than drafting — a list the owner did not build is a list they have not agreed to. |
 | `audit-absolutes` | user | Finds every "must", "never", "always" and "only", and asks once, early, which are promises and which were emphasis. |
 | `stress` | user | Presses a high-level design for practicality. Three verdicts, one of which is **build it and find out**. Reports; never edits. |
+| `focus` | user | Distils the big design and plan documents into a one-screen `NEXT.md` and a decisions queue ordered by when each call is forced, not by importance. |
 | `guard` | model | Proves a test actually bites, by breaking the thing minimally and watching it fail. Two hard-won lessons about tests that pass for the wrong reason. |
 | `drift` | model | Finds claims in the docs that a change quietly made false. |
 | `tangent` | model | Parks a thought raised mid-task, then asks which thread to pull. |
