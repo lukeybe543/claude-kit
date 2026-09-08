@@ -45,7 +45,8 @@ the documents already lean one way.
 3. Pull every open question from both documents. Drop the ones that do not touch the next
    few milestones. Sort the rest by the milestone that forces them.
 4. Write `notes/decisions-queue.md`, then write `NEXT.md` as the short view over it.
-5. Add a pointer from `CLAUDE.md` so the next session finds them.
+5. Ensure `CLAUDE.md` points at both, so the next session finds them. On a refresh run
+   the pointer is already there — leave it.
 
 ## Keeping them honest
 
