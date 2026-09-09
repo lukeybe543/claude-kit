@@ -1,10 +1,10 @@
 # Prompt: rebuild this notification system on Linux
 
-Paste everything below the line into a fresh Claude Code session on the Fedora
-machine. It is self-contained — it does not need this repository, only the
-description. If you can copy files instead, do that: `python
-.claude/hooks/notify.py install /path/to/project` already works on Linux, and
-this prompt exists for the case where you are starting clean.
+Paste everything below the line into a fresh Claude Code session. It is
+self-contained — it does not need this repository, only the description. If you
+can copy files instead, do that: `python3 install.py` from a claude-kit checkout
+sets the whole thing up. This prompt exists for the case where you are starting
+clean.
 
 ---
 
@@ -108,6 +108,8 @@ with `ntfy` pointed at a topic you subscribe to, a needs-you push arriving on
 your phone, and an unreachable `ntfy` URL leaving the hook still exiting 0. Then
 confirm the settings file is valid JSON and that the hooks are actually live.
 
-Finally, add a `python notify.py install <project>` command that copies the
-script and config into another project and merges its hook entries into that
-project's `.claude/settings.json` without disturbing what is already there.
+Install it machine-global: the script at `~/.claude/hooks/notify.py`, the hook
+entries merged into `~/.claude/settings.json` (absolute path to the script, not
+a relative one), state under `~/.claude/hooks/state/`. It should find the
+project a hook is acting on from `$CLAUDE_PROJECT_DIR` and merge a project's
+`<project>/.claude/notify.json` over the global `~/.claude/hooks/notify.json`.

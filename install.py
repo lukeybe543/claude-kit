@@ -1,147 +1,144 @@
-"""Set a project up with these hooks and this governance.
+"""Install (or update) claude-kit into this machine's ~/.claude.
 
-    python install.py /path/to/project
-    python install.py /path/to/project --hooks        # sounds and checks only
-    python install.py /path/to/project --governance   # docs, skills, commands, permissions
+    python3 install.py              # install / update from this checkout
+    python3 install.py --pull       # git pull this checkout first, then install
+    python3 install.py --desktop    # also set up the desk-listener systemd service
 
-Nothing already in the project is overwritten except `notify.py` itself, which is code and
-is versioned here. Anything you are meant to edit -- the config, CLAUDE.md, the tier
-registry, the skills -- is written once and then left alone, so re-running this to pick up
-a fix never costs you your own edits. Permission rules are merged, never removed.
+Everything is machine-global: the notification hooks, the skills and the agents
+land in ~/.claude and apply to every project and every session. Re-run any time
+to pick up changes — it is idempotent and never overwrites a file you are meant
+to edit (~/.claude/CLAUDE.md, ~/.claude/hooks/notify.json). Per-project
+scaffolding is a separate script, adopt.py.
 """
 
 import json
+import os
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-STATE_IGNORE = ".claude/state/"
-LOCAL_IGNORE = ".claude/hooks/notify.local.json"
+CLAUDE = Path.home() / ".claude"
+NOTIFY = CLAUDE / "hooks" / "notify.py"
 
 
-def _copy(source, destination, overwrite, report):
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    if destination.exists() and not overwrite:
-        report.append("kept    " + str(destination) + " (already there)")
+def _copy_tree(src, dst, report, overwrite=True):
+    dst.mkdir(parents=True, exist_ok=True)
+    for item in sorted(src.iterdir()):
+        if item.name == "__pycache__":
+            continue
+        target = dst / item.name
+        if item.is_dir():
+            _copy_tree(item, target, report, overwrite)
+        elif overwrite or not target.exists():
+            shutil.copy2(item, target)
+            report.append("wrote   " + str(target.relative_to(Path.home())))
+        else:
+            report.append("kept    " + str(target.relative_to(Path.home())))
+
+
+def _install_files(report):
+    _copy_tree(HERE / "hooks", CLAUDE / "hooks", report)
+    for group in ("skills", "agents"):
+        _copy_tree(HERE / group, CLAUDE / group, report)
+    example = CLAUDE / "hooks" / "notify.json.example"
+    default = CLAUDE / "hooks" / "notify.json"
+    if example.exists() and not default.exists():
+        shutil.copy2(example, default)
+        report.append("wrote   " + str(default.relative_to(Path.home())))
+    (CLAUDE / "hooks" / "state").mkdir(parents=True, exist_ok=True)
+
+
+def _install_claude_md(report):
+    src, dst = HERE / "global" / "CLAUDE.md", CLAUDE / "CLAUDE.md"
+    if not dst.exists():
+        shutil.copy2(src, dst)
+        report.append("wrote   .claude/CLAUDE.md")
         return
-    shutil.copy2(source, destination)
-    report.append("wrote   " + str(destination))
+    if dst.read_text() == src.read_text():
+        report.append("kept    .claude/CLAUDE.md (already current)")
+        return
+    report.append("SKIPPED .claude/CLAUDE.md -- one already exists and differs.")
+    report.append("        Review the diff and merge by hand:")
+    report.append("          diff ~/.claude/CLAUDE.md " + str(src))
 
 
-def _settings(target):
-    path = target / ".claude" / "settings.json"
+def _merge_settings(report):
+    path = CLAUDE / "settings.json"
     try:
-        return path, json.loads(path.read_text())
+        settings = json.loads(path.read_text())
     except (OSError, ValueError):
-        return path, {}
+        settings = {}
 
-
-def _save(path, settings):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(settings, indent=2) + "\n")
-
-
-def _install_hooks(target, report):
-    hooks = target / ".claude" / "hooks"
-    for name in ("notify.py", "README.md", "RECREATE-ON-LINUX.md"):
-        _copy(HERE / "hooks" / name, hooks / name, True, report)
-    _copy(HERE / "hooks" / "notify.json.example", hooks / "notify.json", False, report)
-    _copy(HERE / "hooks" / "sounds" / "generate.py",
-          hooks / "sounds" / "generate.py", True, report)
-    for wav in sorted((HERE / "hooks" / "sounds").glob("*.wav")):
-        _copy(wav, hooks / "sounds" / wav.name, True, report)
-    for source in sorted(p for p in (HERE / "hooks" / "desk-listener").iterdir()
-                         if p.is_file()):
-        _copy(source, hooks / "desk-listener" / source.name, True, report)
-
-    path, settings = _settings(target)
-    wanted = json.loads((HERE / "hooks" / "settings-hooks.json").read_text())["hooks"]
+    hooks_template = (HERE / "global" / "settings-hooks.json").read_text()
+    wanted = json.loads(hooks_template.replace("__NOTIFY__", str(NOTIFY)))["hooks"]
     existing = settings.setdefault("hooks", {})
 
     def _is_notify_group(group):
-        hooks_ = group.get("hooks") or []
-        return bool(hooks_) and all("notify.py" in h.get("command", "")
-                                    for h in hooks_)
+        hs = group.get("hooks") or []
+        return bool(hs) and all("notify.py" in h.get("command", "") for h in hs)
 
-    # Replace, don't append: drop any prior notify.py wiring for each event so a
-    # re-install picks up changed commands instead of doubling every hook.
-    added = 0
     for event, groups in wanted.items():
         current = existing.setdefault(event, [])
         current[:] = [g for g in current if not _is_notify_group(g)] + list(groups)
-        added += len(groups)
-    _save(path, settings)
-    report.append("wired   " + str(added) + " notify hook group(s) into " + str(path))
 
-    ignore = target / ".gitignore"
-    text = ignore.read_text() if ignore.exists() else ""
-    missing = [line for line in (STATE_IGNORE, LOCAL_IGNORE) if line not in text]
-    if missing:
-        prefix = "" if text.endswith("\n") or not text else "\n"
-        ignore.write_text(text + prefix + "\n# Claude hooks: scratch state and "
-                          "per-machine config (the ntfy URL).\n" + "\n".join(missing)
-                          + "\n")
-        report.append("wrote   " + str(ignore) + " (ignoring " + ", ".join(missing) + ")")
-
-
-def _install_permissions(target, report):
-    """Add permission rules that are not already there. Never removes one."""
-    baseline = json.loads((HERE / "governance" / "permissions.json").read_text())
-    path, settings = _settings(target)
-    permissions = settings.setdefault("permissions", {})
+    baseline = json.loads((HERE / "global" / "permissions.json").read_text())["permissions"]
+    perms = settings.setdefault("permissions", {})
     added = 0
-    for kind, rules in baseline["permissions"].items():
+    for kind, rules in baseline.items():
         if kind == "defaultMode":
-            if "defaultMode" not in permissions:
-                permissions["defaultMode"] = rules
-                report.append("set     permissions.defaultMode = " + rules)
+            perms.setdefault("defaultMode", rules)
             continue
-        current = permissions.setdefault(kind, [])
+        have = perms.setdefault(kind, [])
         for rule in rules:
-            if rule not in current:
-                current.append(rule)
+            if rule not in have:
+                have.append(rule)
                 added += 1
-    _save(path, settings)
-    report.append("merged  " + str(added) + " permission rule(s) into " + str(path))
+
+    path.write_text(json.dumps(settings, indent=2) + "\n")
+    report.append("merged  .claude/settings.json (notify hooks re-wired, "
+                  + str(added) + " permission rule(s) added)")
 
 
-def _install_governance(target, report):
-    _copy(HERE / "governance" / "CLAUDE.md", target / "CLAUDE.md", False, report)
-    _copy(HERE / "governance" / "tiers.md", target / "docs" / "tiers.md", False, report)
-    for skill in sorted((HERE / "skills").iterdir()):
-        _copy(skill / "SKILL.md",
-              target / ".claude" / "skills" / skill.name / "SKILL.md", False, report)
-    for command in sorted((HERE / "commands").glob("*.md")):
-        _copy(command, target / ".claude" / "commands" / command.name, False, report)
-    for agent in sorted((HERE / "agents").glob("*.md")):
-        _copy(agent, target / ".claude" / "agents" / agent.name, False, report)
-    _install_permissions(target, report)
+def _install_desktop(report):
+    unit_src = CLAUDE / "hooks" / "desk-listener" / "desk-listener.service"
+    unit_dst = Path.home() / ".config" / "systemd" / "user" / "desk-listener.service"
+    unit_dst.parent.mkdir(parents=True, exist_ok=True)
+    listener = CLAUDE / "hooks" / "desk-listener" / "listener.py"
+    text = unit_src.read_text()
+    # point ExecStart at the installed listener, whatever the template said
+    lines = []
+    for line in text.splitlines():
+        if line.startswith("ExecStart="):
+            line = "ExecStart=/usr/bin/python3 " + str(listener)
+        lines.append(line)
+    unit_dst.write_text("\n".join(lines) + "\n")
+    report.append("wrote   " + str(unit_dst.relative_to(Path.home())))
+    for cmd in (["systemctl", "--user", "daemon-reload"],
+                ["systemctl", "--user", "enable", "--now", "desk-listener"]):
+        subprocess.run(cmd, check=False)
+    report.append("        systemctl --user enable --now desk-listener")
+    report.append("        (firewall: allow tcp/19191 on the tailnet zone; "
+                  "loginctl enable-linger to survive logout)")
 
 
 def main():
-    if len(sys.argv) < 2:
-        print(__doc__)
-        return 2
-    target = Path(sys.argv[1]).expanduser().resolve()
-    if not target.is_dir():
-        print("Not a directory: " + str(target))
-        return 1
-    flags = set(sys.argv[2:])
+    flags = set(sys.argv[1:])
+    if "--pull" in flags:
+        subprocess.run(["git", "-C", str(HERE), "pull", "--ff-only"], check=False)
 
     report = []
-    if "--governance" not in flags:
-        _install_hooks(target, report)
-    if "--hooks" not in flags:
-        _install_governance(target, report)
+    _install_files(report)
+    _install_claude_md(report)
+    _merge_settings(report)
+    if "--desktop" in flags:
+        _install_desktop(report)
 
     print("\n".join(report))
-    print("\nNext:")
-    print("  1. Point .claude/hooks/notify.json at this project's lint and test commands,")
-    print("     and list the document folders to guard in guarded_paths.")
-    print("  2. Run /charter to fill in docs/tiers.md by interview, before writing code.")
-    print("  3. Fill in .claude/commands/check.md with this project's own check commands.")
-    print("  4. Open /hooks once so Claude Code picks up the new settings.")
+    print("\nDone. Open /hooks in a running session once so Claude Code reloads "
+          "settings.\nUpdate later with:  git -C " + str(HERE)
+          + " pull && python3 " + str(HERE / "install.py"))
     return 0
 
 

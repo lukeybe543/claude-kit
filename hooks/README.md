@@ -13,30 +13,25 @@ matter into sounds, and uses the same wiring to lint and verify as work happens.
 | An edit touches reserved text | Turns into a permission prompt instead of just happening |
 | The session is about to compact | A distinct sound — the session has grown expensive |
 | A session starts | Says so if the last verification run left the tree red |
-| Any of the above, with `ntfy` configured | Also sends a one-line push (needs-you / turn-end / commit-blocked / compacting) — the channel that reaches you when the sound cannot |
+| Any of the above, with a push channel configured | Also sends a one-line push (needs-you / turn-end / commit-blocked / compacting) — the channel that reaches you when the sound cannot |
 
-## Installing it in another project
+## How it is installed
 
-```
-python .claude/hooks/notify.py install /path/to/other/project
-```
+`notify.py` lives at `~/.claude/hooks/notify.py` and is wired into
+`~/.claude/settings.json` by the top-level `install.py`, so every project gets
+it. It finds the project a hook is acting on from `$CLAUDE_PROJECT_DIR`.
 
-That copies the script, this README and the bundled `sounds/`, writes a blank
-`notify.json`, and merges the hook entries into the target's
-`.claude/settings.json`, leaving anything already there alone. It deliberately copies only the hooks that *are* this
-script — project-specific rules written directly into `settings.json`, like the
-blocked-path rule below, stay behind.
-
-Then point `notify.json` at the new project's commands. Every key is optional;
-an empty or missing one turns that behaviour off, so a project with no test
-suite simply gets the sounds.
+Config is merged, later winning: `~/.claude/hooks/notify.json` (global
+defaults) → `<project>/.claude/notify.json` (that project's `lint` / `verify` /
+`guarded_paths`) → `*.local.json` beside each (the push URLs and tokens,
+gitignored). A project with no `notify.json` just gets the sounds and pushes.
 
 ```json
 {
   "lint": ["{python}", "-m", "ruff", "check", "{file}"],
   "lint_suffixes": [".py"],
   "verify": ["bash", "run_tests.sh"],
-  "guarded_text": ["RULE_VERSION"]
+  "guarded_paths": ["design.md"]
 }
 ```
 
@@ -83,11 +78,11 @@ and a failed or slow one is swallowed after 5 s.
 }
 ```
 
-- **`local`** — a port reverse-forwarded from the dev box to the machine you
-  actually sit at, where a small listener plays the sound and pops a desktop
-  notification. Only fires while you are connected. See
-  [`desk-listener/`](desk-listener/README.md). This is the one to use for a
-  fixed workstation.
+- **`local`** — the desk-listener on the machine you actually sit at, reached
+  over a tailnet (fires whenever that machine is up) or a reverse SSH forward
+  (fires while you are connected). It plays the sound and pops a desktop
+  notification. See [`desk-listener/`](desk-listener/README.md). This is the one
+  to use for a fixed workstation.
 - **`ntfy`** — an [ntfy](https://ntfy.sh) topic; subscribe in the app and pick
   the sound there. For a phone. (Android per-channel sound settings can be
   fiddly — check the *Max priority* channel.)
@@ -95,33 +90,11 @@ and a failed or slow one is swallowed after 5 s.
   an application for the API token, and take your user key from the dashboard.
   For a phone, when ntfy's sound won't cooperate.
 
-## The project-specific rule this project also uses
-
-`.claude/settings.json` blocks reads of `docs/archive/**` with a static
-`PreToolUse` rule — no Python involved. It is a project rule rather than part of
-this script, so `install` does not carry it to other projects. The pattern is
-worth copying by hand where a directory must never be read as spec:
-
-```json
-"PreToolUse": [
-  {
-    "matcher": "Read",
-    "hooks": [
-      {
-        "type": "command",
-        "if": "Read(docs/archive/**)",
-        "command": "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"...\"}}'"
-      }
-    ]
-  }
-]
-```
-
 ## Housekeeping
 
-State lives in `.claude/state/` (gitignored): the ring token, the turn clock,
-and `last-verify.log`, which holds the full output of the last verification run.
-Per-machine config lives in `.claude/hooks/notify.local.json` (also gitignored),
-layered over the tracked `notify.json` — that is where the `ntfy` URL belongs.
-`/hooks` lists everything that is live, and disabling any of it is a matter of
-deleting its entry from `.claude/settings.json`.
+State lives in `~/.claude/hooks/state/`: the ring token, the turn clock, and
+`last-verify.log` (the full output of the last verification run — shared across
+the machine's sessions, so acting in any session silences a ring). Per-machine
+push config is `~/.claude/hooks/notify.local.json`, gitignored. `/hooks` lists
+everything live; disable any of it by deleting its entry from
+`~/.claude/settings.json`.

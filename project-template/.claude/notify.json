@@ -1,0 +1,23 @@
+{
+  "_comment": [
+    "Optional. Merged over ~/.claude/hooks/notify.json for this project only.",
+    "Every key is optional; an absent one leaves that behaviour off, so a project",
+    "that just wants the notification sounds needs no file at all.",
+    "",
+    "lint          -- run on each written file. {python} = the running interpreter,",
+    "                 {file} = the file just written. Exit non-zero sends it back.",
+    "lint_suffixes -- which file suffixes to lint / count as 'code changed'.",
+    "verify        -- the whole check. Runs after a turn that changed code, and",
+    "                 before a commit, which is refused while it is red.",
+    "guarded_paths -- an edit to a path containing one of these becomes a",
+    "                 permission prompt. For documents where a misread requirement",
+    "                 is expensive.",
+    "guarded_text  -- an edit whose payload contains one of these becomes a",
+    "                 permission prompt. For a reserved constant, e.g. a version."
+  ],
+  "lint": [],
+  "lint_suffixes": [],
+  "verify": [],
+  "guarded_paths": [],
+  "guarded_text": []
+}

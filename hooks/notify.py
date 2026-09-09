@@ -1,9 +1,11 @@
 """Audible alerts, lint-on-edit and post-turn verification, as Claude Code hooks.
 
-Portable by design. Everything platform-specific lives in the backend section
-below, and everything project-specific lives in `notify.json` beside this file,
-so the script itself copies into any project unchanged -- `python notify.py
-install <project>` does exactly that. See README.md.
+Installed once per machine at `~/.claude/hooks/notify.py` and wired into
+`~/.claude/settings.json`, so every project and every session gets it with no
+per-project setup. Project-specific behaviour (guarded paths, a lint command, a
+verify command) is opt-in: drop a `.claude/notify.json` in the project and it is
+merged over the global defaults. The project a hook is acting on comes from
+`$CLAUDE_PROJECT_DIR`.
 
 Speech: on Linux this speaks results through `spd-say` where it is present. On
 Windows it cannot -- PowerShell runs in ConstrainedLanguage mode and Windows
@@ -27,9 +29,14 @@ import wave
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
-ROOT = HERE.parents[1]
-STATE = HERE.parent / "state"
+STATE = HERE / "state"
 QUIET = {"stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL}
+
+
+def _project_dir():
+    """The project the current hook is acting on."""
+    return Path(os.environ.get("CLAUDE_PROJECT_DIR") or Path.cwd())
+
 
 # One round of "needs-you" is this many plays of the sound.
 RING_REPEATS = 2
@@ -138,15 +145,22 @@ def _flag(name):
 
 
 def _config():
-    """notify.json, with an optional gitignored notify.local.json layered over it.
+    """The merged config, in increasing precedence:
 
-    Per-machine settings -- the ntfy URL especially -- belong in the local file
-    so they never reach git.
+      1. ~/.claude/hooks/notify.json          -- global defaults (usually empty)
+      2. <project>/.claude/notify.json         -- this project's lint/verify/guards
+      3. ~/.claude/hooks/notify.local.json     -- this machine's push URLs/tokens
+      4. <project>/.claude/notify.local.json   -- rare per-project machine override
+
+    *.local.json holds URLs and tokens and is gitignored; the rest is committed.
     """
+    project = _project_dir() / ".claude"
+    sources = (HERE / "notify.json", project / "notify.json",
+               HERE / "notify.local.json", project / "notify.local.json")
     config = {}
-    for name in ("notify.json", "notify.local.json"):
+    for source in sources:
         try:
-            config.update(json.loads((HERE / name).read_text()))
+            config.update(json.loads(source.read_text()))
         except (OSError, ValueError):
             pass
     return config
@@ -179,10 +193,10 @@ def _post(url, data, headers):
 
 
 def _notify_push(title, body, event="needs-you", priority="default", tags=""):
-    """Fan the alert out to every notifier set in notify.local.json.
+    """Fan the alert out to every notifier in the merged config's *.local.json.
 
-    `local` is a port reverse-forwarded from here to the desktop you sit at, so
-    it makes a sound on that machine (see desk-listener/); `ntfy` and `pushover`
+    `local` is the desk-listener on the machine you sit at, reached over a
+    tailnet or a reverse SSH forward (see desk-listener/); `ntfy` and `pushover`
     reach a phone. Configure any combination; an unset one is simply skipped.
     """
     config = _config()
@@ -240,7 +254,7 @@ def ring():
     token = str(os.getpid())
     _flag("ringing").write_text(token)
     message = (_stdin_payload().get("message") or "").strip()
-    _notify_push(ROOT.name + " needs you",
+    _notify_push(_project_dir().name + " needs you",
                  message or "Claude is waiting for a permission or an answer",
                  event="needs-you", priority="max", tags="bell")
     for round_number in range(NOTIFY_ROUNDS):
@@ -287,8 +301,8 @@ def guard_edit():
     else:
         word = next((w for w in guarded_text if w in json.dumps(tool_input)), None)
         if word:
-            reason = ("This edit touches " + word + ", which docs/tiers.md places in "
-                      "Tier 1 -- settled, and the owner's call rather than Claude's.")
+            reason = ("This edit touches " + word + ", which the project's decision "
+                      "register reserves for the owner rather than Claude.")
     if not reason:
         return 0
 
@@ -316,7 +330,7 @@ def after_edit():
 
     filled = [sys.executable if a == "{python}" else a.replace("{file}", path)
               for a in command]
-    lint = subprocess.run(filled, cwd=ROOT, capture_output=True, text=True, check=False)
+    lint = subprocess.run(filled, cwd=_project_dir(), capture_output=True, text=True, check=False)
     if lint.returncode:
         print(lint.stdout or lint.stderr, file=sys.stderr)
         return 2  # exit 2 feeds stderr back to Claude as a blocking error
@@ -358,7 +372,7 @@ def _run_verify():
     if not (Path(filled[0]).is_file() or shutil.which(filled[0])):
         return None
 
-    run = subprocess.run(filled, cwd=ROOT, capture_output=True, text=True, check=False)
+    run = subprocess.run(filled, cwd=_project_dir(), capture_output=True, text=True, check=False)
     output = run.stdout + run.stderr
     STATE.mkdir(parents=True, exist_ok=True)
     _flag("last-verify.log").write_text(output)
@@ -376,7 +390,7 @@ def turn_end():
             return 0
         if time.time() - started >= QUIET_TURN_SECONDS:
             _play_once("done")
-            _notify_push(ROOT.name, "Turn finished", event="done",
+            _notify_push(_project_dir().name, "Turn finished", event="done",
                          tags="white_check_mark")
         return 0
 
@@ -384,13 +398,13 @@ def turn_end():
     passed, _ = result
     _play_once("pass" if passed else "fail")
     _speak("Verification passed" if passed else "Verification failed")
-    _notify_push(ROOT.name,
+    _notify_push(_project_dir().name,
                  "Verification passed" if passed else "Verification FAILED",
                  event="pass" if passed else "fail",
                  priority="default" if passed else "high")
     print(json.dumps({"systemMessage": (
         "Verification: ALL LAYERS PASS" if passed else
-        "Verification: SOME LAYERS FAILED -- see .claude/state/last-verify.log"
+        "Verification: SOME LAYERS FAILED -- see ~/.claude/hooks/state/last-verify.log"
     )}))
     return 0
 
@@ -428,7 +442,7 @@ def commit_gate():
         return 0
 
     _play_once("fail")
-    _notify_push(ROOT.name + " commit blocked",
+    _notify_push(_project_dir().name + " commit blocked",
                  "Verification is red; nothing was committed",
                  event="fail", priority="high")
     failed = [line.strip() for line in output.splitlines() if ": FAIL" in line]
@@ -437,7 +451,7 @@ def commit_gate():
         "permissionDecision": "deny",
         "permissionDecisionReason": (
             "Verification is red, so nothing was committed: "
-            + "; ".join(failed or ["see .claude/state/last-verify.log"])
+            + "; ".join(failed or ["see ~/.claude/hooks/state/last-verify.log"])
             + ". Fix it first, or commit by hand if this is deliberate."
         ),
     }}))
@@ -447,7 +461,7 @@ def commit_gate():
 def compacting():
     """Compaction means the session has grown expensive; say so out loud."""
     _play_once("compacting")
-    _notify_push(ROOT.name, "Session compacting -- it has grown long",
+    _notify_push(_project_dir().name, "Session compacting -- it has grown long",
                  event="compacting", priority="low")
     print(json.dumps({"systemMessage": (
         "Compacting -- this session has grown long. Finishing the current task and "
@@ -466,7 +480,7 @@ def session_start():
         return 0
     failed = [line for line in log.splitlines() if ": FAIL" in line]
     note = ("The last verification run left the tree red: "
-            + "; ".join(failed or ["see .claude/state/last-verify.log"]))
+            + "; ".join(failed or ["see ~/.claude/hooks/state/last-verify.log"]))
     print(json.dumps({
         "systemMessage": note,
         "hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": note},
@@ -505,54 +519,6 @@ def selftest():
     return 0
 
 
-def install():
-    """Copy these hooks into another project, settings and all."""
-    target = Path(sys.argv[2]).expanduser().resolve()
-    hooks = target / ".claude" / "hooks"
-    hooks.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(HERE / "notify.py", hooks / "notify.py")
-    shutil.copy2(HERE / "README.md", hooks / "README.md")
-    (hooks / "sounds").mkdir(exist_ok=True)
-    for name in ("generate.py", *(p.name for p in (HERE / "sounds").glob("*.wav"))):
-        shutil.copy2(HERE / "sounds" / name, hooks / "sounds" / name)
-    (hooks / "desk-listener").mkdir(exist_ok=True)
-    for source in (HERE / "desk-listener").iterdir():
-        shutil.copy2(source, hooks / "desk-listener" / source.name)
-    if not (hooks / "notify.json").exists():
-        (hooks / "notify.json").write_text(json.dumps(
-            {"lint": [], "lint_suffixes": [], "verify": [], "guarded_text": []},
-            indent=2) + "\n")
-
-    settings_path = target / ".claude" / "settings.json"
-    try:
-        settings = json.loads(settings_path.read_text())
-    except (OSError, ValueError):
-        settings = {}
-
-    # Take the hook groups that are this script, so project-specific rules -- a
-    # blocked path, say -- are never carried across with it.
-    mine = json.loads((HERE.parent / "settings.json").read_text()).get("hooks")
-    if not mine:
-        print("No hooks to export: " + str(HERE.parent / "settings.json")
-              + " has none. Install from a project where these hooks are already wired.")
-        return 1
-    existing = settings.setdefault("hooks", {})
-    added = 0
-    for event, groups in mine.items():
-        portable = [group for group in groups
-                    if all("notify.py" in h.get("command", "") for h in group["hooks"])]
-        for group in portable:
-            if group not in existing.setdefault(event, []):
-                existing[event].append(group)
-                added += 1
-
-    settings_path.write_text(json.dumps(settings, indent=2) + "\n")
-    print("Installed into " + str(target) + ": " + str(added) + " hook group(s). "
-          "Edit " + str(hooks / "notify.json") + " to point lint and verify at "
-          "this project's own commands.")
-    return 0
-
-
 COMMANDS = {
     "ring": ring,
     "silence": silence,
@@ -564,7 +530,6 @@ COMMANDS = {
     "selftest": selftest,
     "compacting": compacting,
     "session-start": session_start,
-    "install": install,
 }
 
 
