@@ -51,20 +51,28 @@ def _install_hooks(target, report):
           hooks / "sounds" / "generate.py", True, report)
     for wav in sorted((HERE / "hooks" / "sounds").glob("*.wav")):
         _copy(wav, hooks / "sounds" / wav.name, True, report)
-    for source in sorted((HERE / "hooks" / "desk-listener").iterdir()):
+    for source in sorted(p for p in (HERE / "hooks" / "desk-listener").iterdir()
+                         if p.is_file()):
         _copy(source, hooks / "desk-listener" / source.name, True, report)
 
     path, settings = _settings(target)
     wanted = json.loads((HERE / "hooks" / "settings-hooks.json").read_text())["hooks"]
     existing = settings.setdefault("hooks", {})
+
+    def _is_notify_group(group):
+        hooks_ = group.get("hooks") or []
+        return bool(hooks_) and all("notify.py" in h.get("command", "")
+                                    for h in hooks_)
+
+    # Replace, don't append: drop any prior notify.py wiring for each event so a
+    # re-install picks up changed commands instead of doubling every hook.
     added = 0
     for event, groups in wanted.items():
-        for group in groups:
-            if group not in existing.setdefault(event, []):
-                existing[event].append(group)
-                added += 1
+        current = existing.setdefault(event, [])
+        current[:] = [g for g in current if not _is_notify_group(g)] + list(groups)
+        added += len(groups)
     _save(path, settings)
-    report.append("merged  " + str(added) + " hook group(s) into " + str(path))
+    report.append("wired   " + str(added) + " notify hook group(s) into " + str(path))
 
     ignore = target / ".gitignore"
     text = ignore.read_text() if ignore.exists() else ""

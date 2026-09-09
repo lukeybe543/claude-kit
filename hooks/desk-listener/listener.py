@@ -2,40 +2,34 @@
 """Play a sound on the desktop you sit at when a remote notify.py hook asks.
 
 The notify.py hooks run on the dev box (a headless droplet), which has no audio.
-This runs on your own machine and listens on a loopback port; the dev box
-reaches it through a reverse SSH forward of that same port. When the forward is
-down -- you are not connected -- the hook's POST just fails, silently, which is
-what you want.
+This runs on your own machine and plays the bundled sound plus a desktop popup
+when the dev box POSTs to it. Two ways for the dev box to reach it:
 
-    # ~/.ssh/config, for the dev box:
-    #   Host <dev-box>
-    #       RemoteForward 127.0.0.1:19191 127.0.0.1:19191
-    #
-    # then, on this machine (systemd --user, see desk-listener.service):
-    python3 listener.py
+  * over a tailnet -- bind 0.0.0.0 here (NOTIFY_LISTEN_ADDR=0.0.0.0) and point
+    the dev box at http://<this-machine-tailscale-ip>:19191; works whenever this
+    machine is up.
+  * over a reverse SSH forward -- keep the default loopback bind and add
+    `RemoteForward 127.0.0.1:19191 127.0.0.1:19191` to ~/.ssh/config for the dev
+    box; works only while you are connected.
 
-    # and on the dev box, in .claude/hooks/notify.local.json:
-    #   { "local": "http://127.0.0.1:19191" }
+Either way, set `"local"` in the dev box's .claude/hooks/notify.local.json to
+the matching URL. See README.md.
 
-Sounds come from ../sounds/ if this repo is checked out here, else the
-freedesktop theme, else nothing but a desktop popup.
+Sounds come from ../sounds/ (the claude-kit / project checkout this file lives
+in). If they are missing, only the desktop popup fires -- it never falls back to
+a system sound.
 """
 
 import json
+import os
 import shutil
 import subprocess
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
 PORT = 19191
-
+LISTEN_ADDR = os.environ.get("NOTIFY_LISTEN_ADDR", "127.0.0.1")
 BUNDLED = Path(__file__).resolve().parent.parent / "sounds"
-FREEDESKTOP = Path("/usr/share/sounds/freedesktop/stereo")
-_THEME = {
-    "needs-you": "phone-incoming-call.oga", "pass": "complete.oga",
-    "fail": "dialog-error.oga", "done": "message.oga",
-    "compacting": "dialog-warning.oga",
-}
 _QUIET = {"stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL}
 
 
@@ -49,11 +43,8 @@ def _player():
 
 
 def _sound(event):
-    bundled = BUNDLED / (event + ".wav")
-    if bundled.is_file():
-        return bundled
-    theme = FREEDESKTOP / _THEME.get(event, "")
-    return theme if theme.is_file() else None
+    wav = BUNDLED / (event + ".wav")
+    return wav if wav.is_file() else None
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -81,4 +72,4 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    HTTPServer(("127.0.0.1", PORT), Handler).serve_forever()
+    HTTPServer((LISTEN_ADDR, PORT), Handler).serve_forever()

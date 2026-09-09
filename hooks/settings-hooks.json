@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .claude/hooks/notify.py turn-start"
+            "command": "python3 \"${CLAUDE_PROJECT_DIR}/.claude/hooks/notify.py\" turn-start"
           }
         ]
       }
@@ -15,7 +15,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .claude/hooks/notify.py silence"
+            "command": "python3 \"${CLAUDE_PROJECT_DIR}/.claude/hooks/notify.py\" silence"
           }
         ]
       },
@@ -24,7 +24,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .claude/hooks/notify.py after-edit",
+            "command": "python3 \"${CLAUDE_PROJECT_DIR}/.claude/hooks/notify.py\" after-edit",
             "timeout": 60,
             "statusMessage": "Linting the file just written"
           }
@@ -36,7 +36,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .claude/hooks/notify.py silence"
+            "command": "python3 \"${CLAUDE_PROJECT_DIR}/.claude/hooks/notify.py\" silence"
           }
         ]
       }
@@ -46,7 +46,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .claude/hooks/notify.py ring",
+            "command": "python3 \"${CLAUDE_PROJECT_DIR}/.claude/hooks/notify.py\" ring",
             "async": true,
             "timeout": 300
           }
@@ -58,7 +58,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .claude/hooks/notify.py turn-end",
+            "command": "python3 \"${CLAUDE_PROJECT_DIR}/.claude/hooks/notify.py\" turn-end",
             "timeout": 300,
             "async": true
           }
@@ -71,7 +71,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .claude/hooks/notify.py guard-edit",
+            "command": "python3 \"${CLAUDE_PROJECT_DIR}/.claude/hooks/notify.py\" guard-edit",
             "timeout": 30
           }
         ]
@@ -81,7 +81,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .claude/hooks/notify.py commit-gate",
+            "command": "python3 \"${CLAUDE_PROJECT_DIR}/.claude/hooks/notify.py\" commit-gate",
             "timeout": 300,
             "statusMessage": "Verifying before the commit"
           }
@@ -93,7 +93,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .claude/hooks/notify.py compacting"
+            "command": "python3 \"${CLAUDE_PROJECT_DIR}/.claude/hooks/notify.py\" compacting"
           }
         ]
       }
@@ -103,7 +103,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python .claude/hooks/notify.py session-start"
+            "command": "python3 \"${CLAUDE_PROJECT_DIR}/.claude/hooks/notify.py\" session-start"
           }
         ]
       }

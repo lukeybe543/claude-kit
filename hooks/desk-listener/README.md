@@ -1,58 +1,74 @@
 # desk-listener — hear the dev box on your own machine
 
-`notify.py` runs on the droplet, which has no audio. This is the other half:
-a tiny listener on **your** machine that plays the sound, reached over a reverse
-SSH forward. It only makes noise while you are connected — the rest of the time
-the hook's POST just fails silently.
+`notify.py` runs on the dev box (a headless droplet), which has no audio. This
+is the other half: a tiny listener on **your** machine that plays the bundled
+sound and pops a desktop notification when the dev box POSTs to it.
 
 ```
-dev box (droplet)                     your machine (Fedora)
-  notify.py hook  ── POST ──>  127.0.0.1:19191  ──>  listener.py  ──>  paplay + notify-send
-                  (reverse-forwarded over your SSH session)
+dev box (droplet)                          your machine
+  notify.py hook  ── POST ──>  :19191  ──>  listener.py  ──>  paplay + notify-send
 ```
 
-## Setup on your machine
+Two transports — pick one and set the dev box's `notify.local.json` `"local"`
+URL to match.
 
-1. **Forward the port on every connection to the dev box.** In `~/.ssh/config`:
+## Over a tailnet (recommended for a fixed workstation)
 
-   ```
-   Host <dev-box>
-       RemoteForward 127.0.0.1:19191 127.0.0.1:19191
-   ```
+The listener binds `0.0.0.0` and the dev box reaches it at the workstation's
+tailnet address. Works whenever the workstation is up — no SSH session needed.
 
-   Zed's remote connections use this file, so nothing else is needed there. A
-   second concurrent connection will log `remote port forwarding failed` and
-   carry on — harmless, the first connection owns the port.
-
-2. **Run the listener**, as a user service so it survives logout:
+1. Install the service (it sets `NOTIFY_LISTEN_ADDR=0.0.0.0`):
 
    ```
    mkdir -p ~/.config/systemd/user
    cp desk-listener.service ~/.config/systemd/user/
-   # edit ExecStart in that copy to this repo's real path
+   # confirm ExecStart points at this file's real path
    systemctl --user daemon-reload
    systemctl --user enable --now desk-listener
    loginctl enable-linger "$USER"
    ```
 
-   Needs `paplay` (or `pw-play` / `aplay` / `canberra-gtk-play`) and, for the
-   popup, `notify-send` (`libnotify`). All standard on a Fedora workstation.
+2. Allow the port on the tailnet zone (firewalld):
 
-## Setup on the dev box
+   ```
+   sudo firewall-cmd --permanent --zone=trusted --add-port=19191/tcp
+   sudo firewall-cmd --reload
+   ```
 
-`.claude/hooks/notify.local.json` (gitignored):
+   (Tailscale usually puts `tailscale0` in the `trusted` zone. Check with
+   `firewall-cmd --get-zone-of-interface=tailscale0`.)
 
-```json
-{ "local": "http://127.0.0.1:19191" }
+3. On the dev box, `.claude/hooks/notify.local.json`:
+
+   ```json
+   { "local": "http://<workstation-tailnet-ip>:19191" }
+   ```
+
+## Over a reverse SSH forward (laptop, or no tailnet)
+
+Only makes noise while you are connected. Set `NOTIFY_LISTEN_ADDR=127.0.0.1` (or
+drop the `Environment=` line), and in `~/.ssh/config` for the dev box:
+
+```
+Host <dev-box>
+    RemoteForward 127.0.0.1:19191 127.0.0.1:19191
 ```
 
-## Check it
+Zed and VS Code remote connections use `~/.ssh/config`. A second concurrent
+connection logs `remote port forwarding failed` and carries on — harmless.
+Dev box `notify.local.json`: `{ "local": "http://127.0.0.1:19191" }`.
 
-With the SSH session up and the listener running, from the dev box:
+## Requirements & check
+
+Needs `paplay` (or `pw-play` / `aplay` / `canberra-gtk-play`) and `notify-send`
+(`libnotify`) — standard on a Fedora workstation. Sounds are read from
+`../sounds/`; if they are missing only the popup fires, never a system sound.
+
+From the dev box:
 
 ```
-curl -sX POST 127.0.0.1:19191 -d '{"event":"needs-you","title":"test","body":"hi"}'
+curl -sX POST <the same URL> -d '{"event":"needs-you","title":"test","body":"hi"}'
 ```
 
-You should hear the arpeggio and see a popup on your machine. `systemctl --user
-status desk-listener` and `journalctl --user -u desk-listener` if not.
+You should hear the bell and see a popup. `systemctl --user status
+desk-listener` and `journalctl --user -u desk-listener -f` if not.
