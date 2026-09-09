@@ -65,6 +65,8 @@ def _install_claude_md(report):
 
 
 def _merge_settings(report):
+    """Wire the notify hooks into ~/.claude/settings.json. Nothing else is
+    touched -- permissions stay a per-project concern (see adopt.py)."""
     path = CLAUDE / "settings.json"
     try:
         settings = json.loads(path.read_text())
@@ -83,22 +85,8 @@ def _merge_settings(report):
         current = existing.setdefault(event, [])
         current[:] = [g for g in current if not _is_notify_group(g)] + list(groups)
 
-    baseline = json.loads((HERE / "global" / "permissions.json").read_text())["permissions"]
-    perms = settings.setdefault("permissions", {})
-    added = 0
-    for kind, rules in baseline.items():
-        if kind == "defaultMode":
-            perms.setdefault("defaultMode", rules)
-            continue
-        have = perms.setdefault(kind, [])
-        for rule in rules:
-            if rule not in have:
-                have.append(rule)
-                added += 1
-
     path.write_text(json.dumps(settings, indent=2) + "\n")
-    report.append("merged  .claude/settings.json (notify hooks re-wired, "
-                  + str(added) + " permission rule(s) added)")
+    report.append("merged  .claude/settings.json (10 notify hook groups re-wired)")
 
 
 def _install_desktop(report):

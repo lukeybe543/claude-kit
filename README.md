@@ -19,9 +19,10 @@ python3 ~/.claude/claude-kit/install.py --desktop  # a workstation with speakers
 ```
 
 This copies the notification hooks, the skills and the agents into `~/.claude/`,
-merges `~/.claude/settings.json` (keeping whatever is already there), and — with
-`--desktop` — sets up the desk-listener service. It is idempotent; **update by
-re-running it**:
+wires the hooks into `~/.claude/settings.json` (keeping whatever is already
+there — permissions and everything else are left alone), and — with `--desktop`
+— sets up the desk-listener service. It is idempotent; **update by re-running
+it**:
 
 ```
 git -C ~/.claude/claude-kit pull && python3 ~/.claude/claude-kit/install.py
@@ -84,9 +85,9 @@ METHOD.md             the docs method, written up
 global/               what install.py puts in ~/.claude
   CLAUDE.md            -> ~/.claude/CLAUDE.md  (behavioural rules, review marks, meta-rule)
   settings-hooks.json  the 10 notify hook entries, merged into ~/.claude/settings.json
-  permissions.json     a safe permission baseline, merged in
 hooks/                notify.py, the bundled sounds, the desk-listener
 skills/  agents/       -> ~/.claude/skills/*, ~/.claude/agents/*
 commands/check.md     a /check template for a project
 project-template/     what adopt.py scaffolds into a project
+  .claude/settings.json   a safe per-project permission baseline
 ```

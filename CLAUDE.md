@@ -12,9 +12,10 @@ A machine-global toolkit for Claude Code, installed into `~/.claude` by
 - **The docs method** — `skills/` (nine, installed to `~/.claude/skills/`),
   `global/CLAUDE.md` (→ `~/.claude/CLAUDE.md`), and `project-template/` +
   `adopt.py` for the per-project half. Written up in `METHOD.md`.
-- **`global/`** is what `install.py` merges into `~/.claude/settings.json`:
-  `settings-hooks.json` (the 10 hook entries, `__NOTIFY__` placeholder) and
-  `permissions.json` (a safe baseline).
+- **`global/settings-hooks.json`** is the 10 hook entries (`__NOTIFY__`
+  placeholder) that `install.py` merges into `~/.claude/settings.json`. It
+  touches nothing else in that file — permissions are a per-project concern
+  (`project-template/.claude/settings.json`, placed by `adopt.py`).
 
 ## Two install paths, do not confuse them
 

@@ -56,6 +56,8 @@ def main():
     for doc in ("charter.md", "decisions.md", "glossary.md"):
         _place(TPL / "docs" / doc, project / "docs" / doc, subs, report)
     _place(TPL / ".claude" / "notify.json", project / ".claude" / "notify.json", subs, report)
+    _place(TPL / ".claude" / "settings.json", project / ".claude" / "settings.json",
+           subs, report)
     _place(HERE / "commands" / "check.md", project / ".claude" / "commands" / "check.md",
            subs, report)
 
