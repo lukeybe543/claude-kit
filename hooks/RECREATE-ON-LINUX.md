@@ -54,16 +54,24 @@ so the older one stands down. Poll every 0.1 seconds — during the sound *and*
 during the 60-second gaps — so acting mid-gap stops the cycle too. On Linux,
 play through a subprocess and `terminate()` it to cut the sound off.
 
-**Sound and speech on Fedora.** Play the freedesktop theme from
-`/usr/share/sounds/freedesktop/stereo/` using the first of `paplay`, `pw-play`,
-`aplay` found on PATH, falling back to `canberra-gtk-play -f`. Use
-`phone-incoming-call.oga` for "needs you", `complete.oga` for pass,
-`dialog-error.oga` for fail, `message.oga` for a finished turn, and
-`dialog-warning.oga` for compaction. For speech use `spd-say -w`, falling back
-to `espeak-ng`. If the installs are missing:
-`sudo dnf install sound-theme-freedesktop pipewire-utils speech-dispatcher`.
+**Sound.** Ship the five sounds as WAVs under `.claude/hooks/sounds/`, with a
+`generate.py` beside them that synthesises them from sine tones (pure standard
+library — `wave`, `math`, `struct` — soft, fast attack, exponential decay). Do
+not depend on a system sound theme: it is absent on a headless box, and the
+stock "incoming call" is the sound I asked you to replace. WAV specifically, so
+`winsound` and `aplay` can both play it. Play through the first of `paplay`,
+`pw-play`, `aplay` on PATH, falling back to `canberra-gtk-play -f`. For speech
+use `spd-say -w`, falling back to `espeak-ng`.
 
-Pick the backend from `sys.platform` at runtime rather than configuring it, and
+**A push channel, because most of the time this runs headless.** I run Claude
+Code over SSH to a server with no audio, where none of the above makes a sound.
+Add an `ntfy` key (read from `.claude/hooks/notify.local.json`, gitignored,
+layered over `notify.json`): when it holds an ntfy topic URL, the needs-you,
+turn-end, commit-blocked and compacting events also POST a one-line message
+(`Title` header + short body, nothing else) to it over HTTPS with `urllib`, a
+5-second timeout, and every failure swallowed. Unset means no push.
+
+Pick the player from `sys.platform` at runtime rather than configuring it, and
 keep the platform-specific parts in one clearly marked section so another OS can
 be added there. (On Windows the same script uses `winsound` and cannot speak,
 because PowerShell runs in ConstrainedLanguage mode and Windows Script Host is
@@ -95,7 +103,9 @@ why.
 a fraction of a second of a simulated action; an uninterrupted cycle giving up
 after three rounds and cleaning up its flag file; an action landing inside a gap
 stopping the cycle; the lint hook exiting 2 on a file with a deliberate error;
-and the guarded-text check firing on a match and staying silent otherwise. Then
+and the guarded-text check firing on a match and staying silent otherwise; and,
+with `ntfy` pointed at a topic you subscribe to, a needs-you push arriving on
+your phone, and an unreachable `ntfy` URL leaving the hook still exiting 0. Then
 confirm the settings file is valid JSON and that the hooks are actually live.
 
 Finally, add a `python notify.py install <project>` command that copies the

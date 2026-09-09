@@ -1,5 +1,6 @@
 __pycache__/
 *.pyc
 
-# Scratch state kept by the hooks, when the kit is used on itself.
+# Scratch state and per-machine hook config, when the kit is used on itself.
 .claude/state/
+.claude/hooks/notify.local.json

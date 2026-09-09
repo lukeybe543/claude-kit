@@ -17,6 +17,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 STATE_IGNORE = ".claude/state/"
+LOCAL_IGNORE = ".claude/hooks/notify.local.json"
 
 
 def _copy(source, destination, overwrite, report):
@@ -46,6 +47,10 @@ def _install_hooks(target, report):
     for name in ("notify.py", "README.md", "RECREATE-ON-LINUX.md"):
         _copy(HERE / "hooks" / name, hooks / name, True, report)
     _copy(HERE / "hooks" / "notify.json.example", hooks / "notify.json", False, report)
+    _copy(HERE / "hooks" / "sounds" / "generate.py",
+          hooks / "sounds" / "generate.py", True, report)
+    for wav in sorted((HERE / "hooks" / "sounds").glob("*.wav")):
+        _copy(wav, hooks / "sounds" / wav.name, True, report)
 
     path, settings = _settings(target)
     wanted = json.loads((HERE / "hooks" / "settings-hooks.json").read_text())["hooks"]
@@ -61,11 +66,13 @@ def _install_hooks(target, report):
 
     ignore = target / ".gitignore"
     text = ignore.read_text() if ignore.exists() else ""
-    if STATE_IGNORE not in text:
+    missing = [line for line in (STATE_IGNORE, LOCAL_IGNORE) if line not in text]
+    if missing:
         prefix = "" if text.endswith("\n") or not text else "\n"
-        ignore.write_text(text + prefix + "\n# Scratch state kept by the Claude hooks.\n"
-                          + STATE_IGNORE + "\n")
-        report.append("wrote   " + str(ignore) + " (ignoring " + STATE_IGNORE + ")")
+        ignore.write_text(text + prefix + "\n# Claude hooks: scratch state and "
+                          "per-machine config (the ntfy URL).\n" + "\n".join(missing)
+                          + "\n")
+        report.append("wrote   " + str(ignore) + " (ignoring " + ", ".join(missing) + ")")
 
 
 def _install_permissions(target, report):

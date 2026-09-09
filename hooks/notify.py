@@ -21,6 +21,7 @@ import shutil
 import subprocess
 import sys
 import time
+import urllib.request
 import wave
 from pathlib import Path
 
@@ -50,25 +51,14 @@ QUIET_TURN_SECONDS = 45
 
 if sys.platform == "win32":
     import winsound
-
-    _MEDIA = Path(os.environ.get("SystemRoot", r"C:\Windows")) / "Media"
-    SOUNDS = {
-        "needs-you": _MEDIA / "Ring01.wav",
-        "pass": _MEDIA / "chimes.wav",
-        "fail": _MEDIA / "chord.wav",
-        "done": _MEDIA / "ding.wav",
-        "compacting": _MEDIA / "ringout.wav",
-    }
 else:
     winsound = None
-    _MEDIA = Path("/usr/share/sounds/freedesktop/stereo")
-    SOUNDS = {
-        "needs-you": _MEDIA / "phone-incoming-call.oga",
-        "pass": _MEDIA / "complete.oga",
-        "fail": _MEDIA / "dialog-error.oga",
-        "done": _MEDIA / "message.oga",
-        "compacting": _MEDIA / "dialog-warning.oga",
-    }
+
+# One bundled WAV per event, identical on every platform. A system sound theme
+# is no good here: it is absent on a headless box, and where it exists the
+# stock "incoming call" is the sound this replaced. See sounds/generate.py.
+SOUNDS = {event: HERE / "sounds" / (event + ".wav")
+          for event in ("needs-you", "pass", "fail", "done", "compacting")}
 
 
 def _player():
@@ -101,6 +91,8 @@ def _sound_seconds(path):
 def _play_once(event):
     """Play a sound and wait for it to finish."""
     path = SOUNDS[event]
+    if not path.is_file():
+        return
     if winsound:
         winsound.PlaySound(str(path), winsound.SND_FILENAME)
         return
@@ -112,6 +104,8 @@ def _play_once(event):
 def _play_interruptibly(event, token):
     """Play a sound once; return True if the user acted before it finished."""
     path = SOUNDS[event]
+    if not path.is_file():
+        return True
     if winsound:
         winsound.PlaySound(str(path), winsound.SND_FILENAME | winsound.SND_ASYNC)
         deadline = time.time() + _sound_seconds(path)
@@ -143,10 +137,18 @@ def _flag(name):
 
 
 def _config():
-    try:
-        return json.loads((HERE / "notify.json").read_text())
-    except (OSError, ValueError):
-        return {}
+    """notify.json, with an optional gitignored notify.local.json layered over it.
+
+    Per-machine settings -- the ntfy URL especially -- belong in the local file
+    so they never reach git.
+    """
+    config = {}
+    for name in ("notify.json", "notify.local.json"):
+        try:
+            config.update(json.loads((HERE / name).read_text()))
+        except (OSError, ValueError):
+            pass
+    return config
 
 
 def _superseded(token):
@@ -154,6 +156,35 @@ def _superseded(token):
         return _flag("ringing").read_text() != token
     except OSError:
         return True
+
+
+def _stdin_payload():
+    """The hook's JSON payload from stdin, or {} when there is nothing to read."""
+    try:
+        return json.load(sys.stdin)
+    except (OSError, ValueError):
+        return {}
+
+
+def _notify_push(title, body, priority="default", tags=""):
+    """Send a phone/desktop notification through ntfy, if one is configured.
+
+    This is the channel that survives a headless box -- no local audio, just an
+    HTTPS POST. Every failure is swallowed: a missed notification must never be
+    able to hold up or break a hook.
+    """
+    url = _config().get("ntfy")
+    if not url:
+        return
+    headers = {"Title": title, "Priority": priority}
+    if tags:
+        headers["Tags"] = tags
+    request = urllib.request.Request(
+        url, data=body.encode("utf-8"), headers=headers, method="POST")
+    try:
+        urllib.request.urlopen(request, timeout=5).close()
+    except Exception:  # noqa: BLE001 -- DNS, timeout, bad URL: all non-fatal
+        pass
 
 
 # ---------------------------------------------------------------------------
@@ -185,6 +216,10 @@ def ring():
     STATE.mkdir(parents=True, exist_ok=True)
     token = str(os.getpid())
     _flag("ringing").write_text(token)
+    message = (_stdin_payload().get("message") or "").strip()
+    _notify_push(ROOT.name + " needs you",
+                 message or "Claude is waiting for a permission or an answer",
+                 priority="high", tags="bell")
     for round_number in range(NOTIFY_ROUNDS):
         if round_number and _wait(ROUND_GAP_SECONDS, token):
             return 0
@@ -318,12 +353,16 @@ def turn_end():
             return 0
         if time.time() - started >= QUIET_TURN_SECONDS:
             _play_once("done")
+            _notify_push(ROOT.name, "Turn finished", tags="white_check_mark")
         return 0
 
     _flag("code-edited").unlink()
     passed, _ = result
     _play_once("pass" if passed else "fail")
     _speak("Verification passed" if passed else "Verification failed")
+    _notify_push(ROOT.name,
+                 "Verification passed" if passed else "Verification FAILED",
+                 priority="default" if passed else "high")
     print(json.dumps({"systemMessage": (
         "Verification: ALL LAYERS PASS" if passed else
         "Verification: SOME LAYERS FAILED -- see .claude/state/last-verify.log"
@@ -364,6 +403,8 @@ def commit_gate():
         return 0
 
     _play_once("fail")
+    _notify_push(ROOT.name + " commit blocked",
+                 "Verification is red; nothing was committed", priority="high")
     failed = [line.strip() for line in output.splitlines() if ": FAIL" in line]
     print(json.dumps({"hookSpecificOutput": {
         "hookEventName": "PreToolUse",
@@ -380,6 +421,7 @@ def commit_gate():
 def compacting():
     """Compaction means the session has grown expensive; say so out loud."""
     _play_once("compacting")
+    _notify_push(ROOT.name, "Session compacting -- it has grown long", priority="low")
     print(json.dumps({"systemMessage": (
         "Compacting -- this session has grown long. Finishing the current task and "
         "starting the next with /clear is cheaper than carrying it forward."
@@ -420,9 +462,14 @@ def selftest():
         assert _is_commit(command), "should gate: " + command
     for command in not_commits:
         assert not _is_commit(command), "should not gate: " + command
-    missing = [name for name, path in SOUNDS.items() if not Path(path).is_file()]
+    missing = [name for name, path in SOUNDS.items() if not path.is_file()]
+    durations = ", ".join(f"{name} {_sound_seconds(path):.2f}s"
+                          for name, path in SOUNDS.items() if path.is_file())
     print("commit detection: " + str(len(commits) + len(not_commits)) + " cases pass")
     print("sounds missing: " + (", ".join(missing) if missing else "none"))
+    print("sound durations: " + (durations or "none"))
+    print("player: " + str(_player()))
+    print("ntfy: " + ("configured" if _config().get("ntfy") else "not configured"))
     print("bash for verification: " + str(_bash()))
     return 0
 
@@ -434,6 +481,9 @@ def install():
     hooks.mkdir(parents=True, exist_ok=True)
     shutil.copy2(HERE / "notify.py", hooks / "notify.py")
     shutil.copy2(HERE / "README.md", hooks / "README.md")
+    (hooks / "sounds").mkdir(exist_ok=True)
+    for name in ("generate.py", *(p.name for p in (HERE / "sounds").glob("*.wav"))):
+        shutil.copy2(HERE / "sounds" / name, hooks / "sounds" / name)
     if not (hooks / "notify.json").exists():
         (hooks / "notify.json").write_text(json.dumps(
             {"lint": [], "lint_suffixes": [], "verify": [], "guarded_text": []},

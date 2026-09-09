@@ -13,6 +13,7 @@ matter into sounds, and uses the same wiring to lint and verify as work happens.
 | An edit touches reserved text | Turns into a permission prompt instead of just happening |
 | The session is about to compact | A distinct sound — the session has grown expensive |
 | A session starts | Says so if the last verification run left the tree red |
+| Any of the above, with `ntfy` configured | Also sends a one-line push (needs-you / turn-end / commit-blocked / compacting) — the channel that reaches you when the sound cannot |
 
 ## Installing it in another project
 
@@ -20,9 +21,9 @@ matter into sounds, and uses the same wiring to lint and verify as work happens.
 python .claude/hooks/notify.py install /path/to/other/project
 ```
 
-That copies the script and this README, writes a blank `notify.json`, and merges
-the hook entries into the target's `.claude/settings.json`, leaving anything
-already there alone. It deliberately copies only the hooks that *are* this
+That copies the script, this README and the bundled `sounds/`, writes a blank
+`notify.json`, and merges the hook entries into the target's
+`.claude/settings.json`, leaving anything already there alone. It deliberately copies only the hooks that *are* this
 script — project-specific rules written directly into `settings.json`, like the
 blocked-path rule below, stay behind.
 
@@ -43,31 +44,44 @@ suite simply gets the sounds.
 written. For a TypeScript project, `["npx", "eslint", "{file}"]` with
 `[".ts", ".tsx"]` and `["npm", "test"]` is the same shape.
 
-## Platforms
+## Sound
 
-The script picks its backend from `sys.platform` at runtime — nothing needs to
-be configured per machine, and the same file works on both. VS Code is not
-involved: the hook is a plain process, so Python's own view of the OS is what
-decides.
+The five sounds ship as WAVs in `sounds/`, the same on every platform —
+`sounds/generate.py` synthesises them from sine tones and can retune them. A
+system sound theme is not used: it is absent on a headless box, and where it
+exists the stock "incoming call" is the sound this replaced. WAV specifically,
+because `winsound` (Windows) and `aplay` both play only WAV.
 
-**Windows** uses `winsound` with the stock sounds in `%SystemRoot%\Media`.
-Speech is unavailable on this machine: PowerShell runs in ConstrainedLanguage
-mode and Windows Script Host is blocked by group policy, so `System.Speech` and
-the `SAPI.SpVoice` COM object both fail, as does `cscript`. Distinct sounds
-stand in for words.
+**Windows** plays them with `winsound`. Speech is unavailable there: PowerShell
+runs in ConstrainedLanguage mode and Windows Script Host is blocked by group
+policy, so `System.Speech`, the `SAPI.SpVoice` COM object and `cscript` all
+fail.
 
-**Linux** plays the freedesktop sound theme through the first of `paplay`,
-`pw-play`, `afplay` or `aplay` it finds, falling back to `canberra-gtk-play`.
-It also *speaks* verification results through `spd-say` (speech-dispatcher) or
-`espeak-ng` where either is installed — so on Fedora the spoken notification
-that Windows cannot give you is available. On a Fedora workstation both the
-sound theme and speech-dispatcher are usually present already; if not:
+**Linux** plays them through the first of `paplay`, `pw-play`, `afplay` or
+`aplay` it finds, falling back to `canberra-gtk-play`. It also *speaks*
+verification results through `spd-say` (speech-dispatcher) or `espeak-ng` where
+either is installed. Nothing is configured per machine; the backend is chosen
+from `sys.platform` at runtime.
 
+## Reaching you on a headless box
+
+Run Claude Code over SSH to a server (a droplet reached from Zed or VS Code) and
+the hook runs *there* — no sound card, no player, silence. The terminal bell is
+no help either: Zed drops OSC 9, and its bell-notification does not fire for
+remote terminals.
+
+The way through is a push. Set `ntfy` in `notify.local.json` (gitignored, so the
+URL never lands in git) to an [ntfy](https://ntfy.sh) topic URL:
+
+```json
+{ "ntfy": "https://ntfy.sh/your-unguessable-topic" }
 ```
-sudo dnf install sound-theme-freedesktop pipewire-utils speech-dispatcher
-```
 
-To add another platform, extend the `SOUNDS` table and `_player()`.
+Subscribe to that topic in the ntfy app (iOS / Android / web / desktop) and pick
+its notification sound there. The needs-you, turn-end, commit-blocked and
+compacting events then POST a one-line message (`Title` + body, nothing else —
+no file contents) over HTTPS. A failed or slow POST is swallowed after 5 s and
+never blocks a hook. Leave `ntfy` unset and nothing is sent.
 
 ## The project-specific rule this project also uses
 
@@ -95,5 +109,7 @@ worth copying by hand where a directory must never be read as spec:
 
 State lives in `.claude/state/` (gitignored): the ring token, the turn clock,
 and `last-verify.log`, which holds the full output of the last verification run.
-Nothing else is written. `/hooks` lists everything that is live, and disabling
-any of it is a matter of deleting its entry from `.claude/settings.json`.
+Per-machine config lives in `.claude/hooks/notify.local.json` (also gitignored),
+layered over the tracked `notify.json` — that is where the `ntfy` URL belongs.
+`/hooks` lists everything that is live, and disabling any of it is a matter of
+deleting its entry from `.claude/settings.json`.

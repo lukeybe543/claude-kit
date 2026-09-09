@@ -9,7 +9,12 @@
     "guarded_text  -- an edit whose text contains one of these becomes a permission",
     "                 prompt. For things the owner has reserved, e.g. a version constant.",
     "guarded_paths -- an edit to a path containing one of these becomes a permission",
-    "                 prompt. For documents, where a misread requirement gets expensive."
+    "                 prompt. For documents, where a misread requirement gets expensive.",
+    "ntfy          -- an ntfy URL, e.g. https://ntfy.sh/<topic>. When set, the",
+    "                 needs-you / turn-end / commit-blocked / compacting events also",
+    "                 POST a one-line notification there -- the channel that reaches",
+    "                 you from a headless box. Put the real URL in notify.local.json",
+    "                 (gitignored), not here."
   ],
   "lint": [],
   "lint_suffixes": [],
