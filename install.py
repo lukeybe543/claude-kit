@@ -51,6 +51,8 @@ def _install_hooks(target, report):
           hooks / "sounds" / "generate.py", True, report)
     for wav in sorted((HERE / "hooks" / "sounds").glob("*.wav")):
         _copy(wav, hooks / "sounds" / wav.name, True, report)
+    for source in sorted((HERE / "hooks" / "desk-listener").iterdir()):
+        _copy(source, hooks / "desk-listener" / source.name, True, report)
 
     path, settings = _settings(target)
     wanted = json.loads((HERE / "hooks" / "settings-hooks.json").read_text())["hooks"]

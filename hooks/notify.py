@@ -21,6 +21,7 @@ import shutil
 import subprocess
 import sys
 import time
+import urllib.parse
 import urllib.request
 import wave
 from pathlib import Path
@@ -166,25 +167,47 @@ def _stdin_payload():
         return {}
 
 
-def _notify_push(title, body, priority="default", tags=""):
-    """Send a phone/desktop notification through ntfy, if one is configured.
-
-    This is the channel that survives a headless box -- no local audio, just an
-    HTTPS POST. Every failure is swallowed: a missed notification must never be
-    able to hold up or break a hook.
-    """
-    url = _config().get("ntfy")
-    if not url:
-        return
-    headers = {"Title": title, "Priority": priority}
-    if tags:
-        headers["Tags"] = tags
-    request = urllib.request.Request(
-        url, data=body.encode("utf-8"), headers=headers, method="POST")
+def _post(url, data, headers):
+    """POST and forget. Any failure -- DNS, timeout, refused, bad URL -- is fine:
+    a missed notification must never be able to hold up or break a hook."""
     try:
-        urllib.request.urlopen(request, timeout=5).close()
-    except Exception:  # noqa: BLE001 -- DNS, timeout, bad URL: all non-fatal
+        urllib.request.urlopen(
+            urllib.request.Request(url, data=data, headers=headers, method="POST"),
+            timeout=5).close()
+    except Exception:  # noqa: BLE001
         pass
+
+
+def _notify_push(title, body, event="needs-you", priority="default", tags=""):
+    """Fan the alert out to every notifier set in notify.local.json.
+
+    `local` is a port reverse-forwarded from here to the desktop you sit at, so
+    it makes a sound on that machine (see desk-listener/); `ntfy` and `pushover`
+    reach a phone. Configure any combination; an unset one is simply skipped.
+    """
+    config = _config()
+
+    ntfy = config.get("ntfy")
+    if ntfy:
+        headers = {"Title": title, "Priority": priority}
+        if tags:
+            headers["Tags"] = tags
+        _post(ntfy, body.encode("utf-8"), headers)
+
+    pushover = config.get("pushover") or {}
+    if pushover.get("token") and pushover.get("user"):
+        _post("https://api.pushover.net/1/messages.json", urllib.parse.urlencode({
+            "token": pushover["token"], "user": pushover["user"],
+            "title": title, "message": body or title,
+            "priority": {"min": -2, "low": -1, "default": 0,
+                         "high": 1, "max": 1}.get(priority, 0),
+        }).encode("utf-8"), {"Content-Type": "application/x-www-form-urlencoded"})
+
+    local = config.get("local")
+    if local:
+        _post(local,
+              json.dumps({"event": event, "title": title, "body": body}).encode("utf-8"),
+              {"Content-Type": "application/json"})
 
 
 # ---------------------------------------------------------------------------
@@ -219,7 +242,7 @@ def ring():
     message = (_stdin_payload().get("message") or "").strip()
     _notify_push(ROOT.name + " needs you",
                  message or "Claude is waiting for a permission or an answer",
-                 priority="high", tags="bell")
+                 event="needs-you", priority="max", tags="bell")
     for round_number in range(NOTIFY_ROUNDS):
         if round_number and _wait(ROUND_GAP_SECONDS, token):
             return 0
@@ -353,7 +376,8 @@ def turn_end():
             return 0
         if time.time() - started >= QUIET_TURN_SECONDS:
             _play_once("done")
-            _notify_push(ROOT.name, "Turn finished", tags="white_check_mark")
+            _notify_push(ROOT.name, "Turn finished", event="done",
+                         tags="white_check_mark")
         return 0
 
     _flag("code-edited").unlink()
@@ -362,6 +386,7 @@ def turn_end():
     _speak("Verification passed" if passed else "Verification failed")
     _notify_push(ROOT.name,
                  "Verification passed" if passed else "Verification FAILED",
+                 event="pass" if passed else "fail",
                  priority="default" if passed else "high")
     print(json.dumps({"systemMessage": (
         "Verification: ALL LAYERS PASS" if passed else
@@ -404,7 +429,8 @@ def commit_gate():
 
     _play_once("fail")
     _notify_push(ROOT.name + " commit blocked",
-                 "Verification is red; nothing was committed", priority="high")
+                 "Verification is red; nothing was committed",
+                 event="fail", priority="high")
     failed = [line.strip() for line in output.splitlines() if ": FAIL" in line]
     print(json.dumps({"hookSpecificOutput": {
         "hookEventName": "PreToolUse",
@@ -421,7 +447,8 @@ def commit_gate():
 def compacting():
     """Compaction means the session has grown expensive; say so out loud."""
     _play_once("compacting")
-    _notify_push(ROOT.name, "Session compacting -- it has grown long", priority="low")
+    _notify_push(ROOT.name, "Session compacting -- it has grown long",
+                 event="compacting", priority="low")
     print(json.dumps({"systemMessage": (
         "Compacting -- this session has grown long. Finishing the current task and "
         "starting the next with /clear is cheaper than carrying it forward."
@@ -469,7 +496,11 @@ def selftest():
     print("sounds missing: " + (", ".join(missing) if missing else "none"))
     print("sound durations: " + (durations or "none"))
     print("player: " + str(_player()))
-    print("ntfy: " + ("configured" if _config().get("ntfy") else "not configured"))
+    config = _config()
+    channels = [name for name in ("local", "ntfy", "pushover")
+                if config.get(name) and (name != "pushover"
+                                         or config["pushover"].get("token"))]
+    print("push channels: " + (", ".join(channels) if channels else "none"))
     print("bash for verification: " + str(_bash()))
     return 0
 
@@ -484,6 +515,9 @@ def install():
     (hooks / "sounds").mkdir(exist_ok=True)
     for name in ("generate.py", *(p.name for p in (HERE / "sounds").glob("*.wav"))):
         shutil.copy2(HERE / "sounds" / name, hooks / "sounds" / name)
+    (hooks / "desk-listener").mkdir(exist_ok=True)
+    for source in (HERE / "desk-listener").iterdir():
+        shutil.copy2(source, hooks / "desk-listener" / source.name)
     if not (hooks / "notify.json").exists():
         (hooks / "notify.json").write_text(json.dumps(
             {"lint": [], "lint_suffixes": [], "verify": [], "guarded_text": []},

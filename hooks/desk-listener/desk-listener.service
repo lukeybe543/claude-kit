@@ -1,0 +1,22 @@
+# systemd --user unit for the desktop notification listener.
+#
+#   mkdir -p ~/.config/systemd/user
+#   cp desk-listener.service ~/.config/systemd/user/
+#   # edit ExecStart below to this repo's real path on this machine
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now desk-listener
+#   loginctl enable-linger "$USER"          # so it runs when you are not logged in
+#
+# See README.md for the matching ~/.ssh/config RemoteForward line.
+
+[Unit]
+Description=Claude Code hook notification listener (plays sounds forwarded from the dev box)
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/python3 %h/before94/.claude/hooks/desk-listener/listener.py
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=default.target

@@ -10,11 +10,13 @@
     "                 prompt. For things the owner has reserved, e.g. a version constant.",
     "guarded_paths -- an edit to a path containing one of these becomes a permission",
     "                 prompt. For documents, where a misread requirement gets expensive.",
-    "ntfy          -- an ntfy URL, e.g. https://ntfy.sh/<topic>. When set, the",
-    "                 needs-you / turn-end / commit-blocked / compacting events also",
-    "                 POST a one-line notification there -- the channel that reaches",
-    "                 you from a headless box. Put the real URL in notify.local.json",
-    "                 (gitignored), not here."
+    "local / ntfy / pushover -- notification channels for the needs-you / turn-end /",
+    "                 commit-blocked / compacting events. Set any combination in",
+    "                 notify.local.json (gitignored), not here:",
+    "                   local    -- URL of the desk-listener, a port reverse-forwarded",
+    "                               to the machine you sit at. See desk-listener/.",
+    "                   ntfy     -- an ntfy topic URL, e.g. https://ntfy.sh/<topic>.",
+    "                   pushover -- a {\"token\": \"...\", \"user\": \"...\"} object for pushover.net."
   ],
   "lint": [],
   "lint_suffixes": [],

@@ -70,18 +70,30 @@ the hook runs *there* — no sound card, no player, silence. The terminal bell i
 no help either: Zed drops OSC 9, and its bell-notification does not fire for
 remote terminals.
 
-The way through is a push. Set `ntfy` in `notify.local.json` (gitignored, so the
-URL never lands in git) to an [ntfy](https://ntfy.sh) topic URL:
+The way through is `_notify_push`, which fans the needs-you / turn-end /
+commit-blocked / compacting events out to whatever is set in `notify.local.json`
+(gitignored — the URLs and tokens never land in git). Each send is independent
+and a failed or slow one is swallowed after 5 s.
 
 ```json
-{ "ntfy": "https://ntfy.sh/your-unguessable-topic" }
+{
+  "local": "http://127.0.0.1:19191",
+  "ntfy": "https://ntfy.sh/your-unguessable-topic",
+  "pushover": { "token": "…", "user": "…" }
+}
 ```
 
-Subscribe to that topic in the ntfy app (iOS / Android / web / desktop) and pick
-its notification sound there. The needs-you, turn-end, commit-blocked and
-compacting events then POST a one-line message (`Title` + body, nothing else —
-no file contents) over HTTPS. A failed or slow POST is swallowed after 5 s and
-never blocks a hook. Leave `ntfy` unset and nothing is sent.
+- **`local`** — a port reverse-forwarded from the dev box to the machine you
+  actually sit at, where a small listener plays the sound and pops a desktop
+  notification. Only fires while you are connected. See
+  [`desk-listener/`](desk-listener/README.md). This is the one to use for a
+  fixed workstation.
+- **`ntfy`** — an [ntfy](https://ntfy.sh) topic; subscribe in the app and pick
+  the sound there. For a phone. (Android per-channel sound settings can be
+  fiddly — check the *Max priority* channel.)
+- **`pushover`** — [Pushover](https://pushover.net): make an account, register
+  an application for the API token, and take your user key from the dashboard.
+  For a phone, when ntfy's sound won't cooperate.
 
 ## The project-specific rule this project also uses
 
