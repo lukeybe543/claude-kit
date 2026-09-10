@@ -144,6 +144,42 @@ def _flag(name):
     return STATE / name
 
 
+def _guarded_marker(session_id):
+    slug = re.sub(r"[^A-Za-z0-9_-]", "_", session_id)[:120]
+    return STATE / ("guarded-seen-" + slug)
+
+
+def _guarded_already_flagged(session_id, path):
+    """A guarded document under active revision is announced once per session,
+    not on every edit. True once an edit to `path` has gone through this session."""
+    if not session_id:
+        return False
+    try:
+        return path in _guarded_marker(session_id).read_text().splitlines()
+    except OSError:
+        return False
+
+
+def _remember_guarded(session_id, path):
+    if not session_id:
+        return
+    STATE.mkdir(parents=True, exist_ok=True)
+    marker = _guarded_marker(session_id)
+    try:
+        seen = set(marker.read_text().splitlines())
+    except OSError:
+        seen = set()
+    if path not in seen:
+        marker.write_text("\n".join(sorted(seen | {path})) + "\n")
+    cutoff = time.time() - 7 * 86400
+    for stale in STATE.glob("guarded-seen-*"):
+        try:
+            if stale.stat().st_mtime < cutoff:
+                stale.unlink()
+        except OSError:
+            pass
+
+
 def _config():
     """The merged config, in increasing precedence:
 
@@ -295,9 +331,12 @@ def guard_edit():
     reason = None
     folder = next((p for p in guarded_paths if p in path), None)
     if folder:
+        if _guarded_already_flagged(payload.get("session_id") or "", path):
+            return 0  # announced once this session; do not nag on every edit
         reason = ("This edits " + folder + ", which the project treats as a document to be "
                   "changed deliberately. Say what the change is and why before making it -- "
-                  "and if the wording carries a requirement, clarify it first.")
+                  "and if the wording carries a requirement, clarify it first. "
+                  "You will not be asked again for this file this session.")
     else:
         word = next((w for w in guarded_text if w in json.dumps(tool_input)), None)
         if word:
@@ -317,11 +356,18 @@ def guard_edit():
 def after_edit():
     """Lint the file that was just written; hand any error straight back."""
     config = _config()
+    payload = json.load(sys.stdin)
+    path = (payload.get("tool_input") or {}).get("file_path") or ""
+
+    # A guarded document, once edited with the owner's ok, is not re-flagged for
+    # the rest of the session -- guard_edit reads this back.
+    norm = path.replace("\\", "/")
+    if any(p in norm for p in config.get("guarded_paths") or []):
+        _remember_guarded(payload.get("session_id") or "", norm)
+
     command = config.get("lint")
     if not command:
         return 0
-    payload = json.load(sys.stdin)
-    path = (payload.get("tool_input") or {}).get("file_path") or ""
     if not any(path.endswith(s) for s in config.get("lint_suffixes") or []):
         return 0
 
