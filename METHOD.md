@@ -64,7 +64,8 @@ substantive change — a reword beyond a typo, a split, a combine, a re-scope �
 **clears the Band to `unset`**, and `unset` is treated as an open question:
 not built against, not cited as settled. After a review that touched several
 rows, the owner re-approves every touched Band as one batch before normal work
-resumes.
+resumes — the `bands` skill builds a published review page for exactly this
+pass (flagged rows and un-Banded rows), then applies the result back.
 
 ### The coding gate
 
@@ -149,11 +150,12 @@ reaches for on its own.
 | `focus` | user | Produces `NEXT.md` and the decisions queue. |
 | `session-log` | user | Before `/clear`: what the session learned — what worked, what was tried and failed, what is untried. The failures are the valuable half. |
 | `flags` | user | Runs the review-mark pass on a document. |
+| `bands` | user | Builds a published review page for the flagged and un-Banded register rows, then applies the owner's dispositions and Bands back to `docs/decisions.md`. The Band re-approval, off the markdown table. |
 | `drift` | model | Finds claims in the docs that a recent change quietly made false. |
 | `guard` | model | Proves a test actually bites, by breaking the thing minimally and watching it fail. |
 | `tangent` | model | Parks a thought raised mid-task, then asks which thread to pull. |
 
-All nine are installed machine-global (`~/.claude/skills/`), so every project
+All ten are installed machine-global (`~/.claude/skills/`), so every project
 has them.
 
 ---

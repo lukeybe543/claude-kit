@@ -9,7 +9,7 @@ A machine-global toolkit for Claude Code, installed into `~/.claude` by
   Wired into `~/.claude/settings.json`, acts on the project in
   `$CLAUDE_PROJECT_DIR`. Push channels (`local` / `ntfy` / `pushover`) carry the
   alert to a workstation or phone when the box running the hook is headless.
-- **The docs method** — `skills/` (nine, installed to `~/.claude/skills/`),
+- **The docs method** — `skills/` (ten, installed to `~/.claude/skills/`),
   `global/CLAUDE.md` (→ `~/.claude/CLAUDE.md`), and `project-template/` +
   `adopt.py` for the per-project half. Written up in `METHOD.md`.
 - **`global/settings-hooks.json`** is the 10 hook entries (`__NOTIFY__`

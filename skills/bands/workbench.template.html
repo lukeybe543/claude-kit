@@ -1,0 +1,604 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__TITLE__</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&display=swap">
+<style>
+  :root {
+    --ground: #f6f5f3;
+    --surface: #ffffff;
+    --surface-sunk: #efeeea;
+    --ink: #1c1d1f;
+    --ink-soft: #43464b;
+    --muted: #74777d;
+    --line: #e1e0db;
+    --line-strong: #cdccc5;
+    --accent: #3a5c86;
+    --accent-soft: #eef2f7;
+    --on-accent: #ffffff;
+    --flag-ground: #fbf4e9;
+    --flag-line: #e6c78a;
+    --flag-label: #97701f;
+    --resolve: #3f7d4f;
+    --topic: #b0781f;
+    --hold: #6d7079;
+    --focus: #3a5c86;
+    --shadow: 0 1px 2px rgba(20,20,18,.04), 0 4px 16px rgba(20,20,18,.05);
+    --radius: 7px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #15171a;
+      --surface: #1e2125;
+      --surface-sunk: #191b1e;
+      --ink: #e9e9e6;
+      --ink-soft: #bcbdc0;
+      --muted: #8c8f96;
+      --line: #2f3338;
+      --line-strong: #3d424a;
+      --accent: #7aa6d8;
+      --accent-soft: #23303f;
+      --on-accent: #14161a;
+      --flag-ground: #2a2317;
+      --flag-line: #6b552c;
+      --flag-label: #d4ab63;
+      --resolve: #6bb47e;
+      --topic: #d6a253;
+      --hold: #9a9da4;
+      --focus: #7aa6d8;
+      --shadow: 0 1px 2px rgba(0,0,0,.2), 0 4px 18px rgba(0,0,0,.28);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #15171a;
+    --surface: #1e2125;
+    --surface-sunk: #191b1e;
+    --ink: #e9e9e6;
+    --ink-soft: #bcbdc0;
+    --muted: #8c8f96;
+    --line: #2f3338;
+    --line-strong: #3d424a;
+    --accent: #7aa6d8;
+    --accent-soft: #23303f;
+    --on-accent: #14161a;
+    --flag-ground: #2a2317;
+    --flag-line: #6b552c;
+    --flag-label: #d4ab63;
+    --resolve: #6bb47e;
+    --topic: #d6a253;
+    --hold: #9a9da4;
+    --focus: #7aa6d8;
+    --shadow: 0 1px 2px rgba(0,0,0,.2), 0 4px 18px rgba(0,0,0,.28);
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+    font-size: 15px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 0 20px 120px; }
+
+  header.page {
+    padding: 40px 0 22px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 8px;
+  }
+  .eyebrow {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 10px;
+  }
+  h1 {
+    font-family: "Source Serif 4", Georgia, serif;
+    font-weight: 600;
+    font-size: 27px;
+    line-height: 1.2;
+    text-wrap: balance;
+    margin: 0 0 12px;
+    letter-spacing: -.01em;
+  }
+  header.page p { margin: 0; color: var(--ink-soft); max-width: 62ch; }
+  header.page em { font-style: italic; color: var(--ink); }
+  code {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: .88em;
+    background: var(--surface-sunk);
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+
+  .status-line {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 16px;
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); flex: none; }
+  .dot.live { background: var(--resolve); }
+  .dot.off { background: var(--topic); }
+
+  .progress {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: color-mix(in srgb, var(--ground) 92%, transparent);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border-bottom: 1px solid var(--line);
+    padding: 12px 0;
+    margin-bottom: 30px;
+    display: flex;
+    gap: 22px;
+    flex-wrap: wrap;
+  }
+  .metric { display: flex; align-items: baseline; gap: 7px; }
+  .metric b {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-weight: 600;
+    font-size: 16px;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+  }
+  .metric span {
+    font-size: 12px;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  section.group { margin-bottom: 44px; }
+  .group-head { margin: 0 0 4px; }
+  .group-head h2 {
+    font-family: "Source Serif 4", Georgia, serif;
+    font-size: 19px;
+    font-weight: 600;
+    margin: 0;
+  }
+  .group-head p {
+    margin: 4px 0 20px;
+    color: var(--muted);
+    font-size: 13.5px;
+    max-width: 62ch;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 18px 20px 20px;
+    margin-bottom: 14px;
+    box-shadow: var(--shadow);
+  }
+  .card.settled { box-shadow: none; background: var(--surface-sunk); border-style: dashed; }
+
+  .card-top {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+  }
+  .id {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--accent);
+    letter-spacing: .02em;
+  }
+  .meta {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: .03em;
+  }
+  .card-state {
+    margin-left: auto;
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11px;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .card-state.saved { color: var(--resolve); }
+  .card-state .tick { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+  .statement {
+    font-family: "Source Serif 4", Georgia, serif;
+    font-size: 16.5px;
+    line-height: 1.5;
+    color: var(--ink);
+    margin: 0 0 14px;
+  }
+  .card.settled .statement { font-size: 15px; color: var(--ink-soft); }
+
+  .flag {
+    background: var(--flag-ground);
+    border-left: 3px solid var(--flag-line);
+    border-radius: 0 4px 4px 0;
+    padding: 10px 13px;
+    margin: 0 0 16px;
+  }
+  .flag .flag-label {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 10.5px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--flag-label);
+    display: block;
+    margin-bottom: 4px;
+  }
+  .flag p { margin: 0; font-size: 14px; color: var(--ink-soft); line-height: 1.5; }
+
+  .note {
+    font-size: 13px;
+    color: var(--muted);
+    margin: -4px 0 14px;
+    padding-left: 13px;
+    border-left: 2px solid var(--line-strong);
+  }
+
+  .field-label {
+    font-size: 12px;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: var(--muted);
+    display: block;
+    margin-bottom: 7px;
+  }
+  textarea {
+    width: 100%;
+    min-height: 70px;
+    resize: vertical;
+    font: inherit;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--ink);
+    background: var(--ground);
+    border: 1px solid var(--line-strong);
+    border-radius: 5px;
+    padding: 9px 11px;
+    margin-bottom: 14px;
+  }
+  textarea::placeholder { color: var(--muted); }
+  textarea:focus-visible, .seg button:focus-visible, .band button:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 1px;
+  }
+
+  .seg, .band { display: flex; flex-wrap: wrap; gap: 6px; }
+  .seg button, .band button {
+    font: inherit;
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--ink-soft);
+    background: var(--surface);
+    border: 1px solid var(--line-strong);
+    border-radius: 100px;
+    padding: 5px 12px;
+    cursor: pointer;
+    transition: background .12s, border-color .12s, color .12s;
+  }
+  .seg button:hover, .band button:hover { border-color: var(--muted); }
+  .seg button[aria-pressed="true"] {
+    color: var(--on-accent);
+    border-color: transparent;
+  }
+  .seg button[data-v="resolve"][aria-pressed="true"] { background: var(--resolve); }
+  .seg button[data-v="topic"][aria-pressed="true"] { background: var(--topic); }
+  .seg button[data-v="withdraw"][aria-pressed="true"] { background: var(--hold); }
+  .seg button[data-v="unsure"][aria-pressed="true"] { background: var(--muted); }
+
+  .band button[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+
+  footer.page {
+    margin-top: 50px;
+    padding-top: 20px;
+    border-top: 1px solid var(--line);
+    font-size: 12.5px;
+    color: var(--muted);
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    line-height: 1.7;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+  }
+  @media (max-width: 560px) {
+    h1 { font-size: 23px; }
+    .card { padding: 16px 15px 18px; }
+    .progress { gap: 14px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="page">
+    <p class="eyebrow">docs/decisions.md &middot; review workbench</p>
+    <h1>__HEADLINE__</h1>
+    <p>Every flagged row below went <code>unset</code> when it was flagged &mdash; not binding until it is resolved and re-Banded. For each one, say what the flag <em>actually</em> means: the real concern, in your words. Then pick whether it can be reworded now or needs its own design conversation. The rows further down were never flagged, just never given an owner Band &mdash; set one on each. Nothing is written back to <code>docs/decisions.md</code> until you say go.</p>
+    <div class="status-line" id="statusline"><span class="dot" id="statusdot"></span><span id="statustext">connecting&hellip;</span></div>
+  </header>
+
+  <div class="progress" id="progress" hidden>
+    <div class="metric"><b id="m-flag">0</b><span>flags triaged</span></div>
+    <div class="metric"><b id="m-band">0</b><span>bands set</span></div>
+  </div>
+
+  <section class="group" id="g-flag">
+    <div class="group-head">
+      <h2>Flagged &mdash; capture the concern</h2>
+      <p>The flag text is yours, verbatim. No proposed rewording here on purpose: the reason behind the flag comes first, so the fix does not bake in a misreading.</p>
+    </div>
+  </section>
+
+  <section class="group" id="g-band">
+    <div class="group-head">
+      <h2>Never flagged &mdash; just needs a Band</h2>
+      <p><strong>firm</strong> &mdash; reopening needs a superseding decision, not a conversation. <strong>mixed</strong> &mdash; a real trade-off; weighed, never a hard blocker. <strong>revisitable</strong> &mdash; actively look for something better.</p>
+    </div>
+  </section>
+
+  <section class="group" id="g-done">
+    <div class="group-head">
+      <h2>Already settled</h2>
+      <p>For reference &mdash; no action needed.</p>
+    </div>
+  </section>
+
+  <footer class="page" id="foot">
+    Your notes save to this page as you type. When you&rsquo;re done, tell Claude and it reads them back, then applies the review to the register.
+  </footer>
+</div>
+
+<script>
+/* The skill replaces the object literal on the next line with the real
+   decisions parsed from docs/decisions.md. Shape:
+   { "flagged": [ { id, meta, statement, flag } ],
+     "toBand":  [ { id, meta, statement, note? } ],
+     "done":    [ { id, statement } ] }
+   `meta` is a short "alt · domain" string; `note` is an optional one-liner. */
+const DECISIONS = {"flagged":[],"toBand":[],"done":[]}; /* __INJECT_DECISIONS__ */
+
+const FLAGGED = DECISIONS.flagged || [];
+const TO_BAND = DECISIONS.toBand || [];
+const DONE = DECISIONS.done || [];
+
+const DISPOSITIONS = [
+  { v: "resolve", label: "Reword now" },
+  { v: "topic", label: "Its own design topic" },
+  { v: "withdraw", label: "Withdraw the flag" },
+  { v: "unsure", label: "Not sure yet" },
+];
+const BANDS = ["firm", "mixed", "revisitable"];
+
+const state = {};   // id -> { concern, disposition, band }
+let db = null;
+const saveTimers = {};
+
+function el(tag, cls, text) {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text != null) n.textContent = text;
+  return n;
+}
+function labelled(txt) { return el("span", "field-label", txt); }
+
+function renderFlagged(d) {
+  const card = el("div", "card");
+  card.id = "card-" + d.id;
+
+  const top = el("div", "card-top");
+  top.append(el("span", "id", d.id));
+  if (d.meta) top.append(el("span", "meta", d.meta));
+  const cs = el("div", "card-state");
+  cs.id = "state-" + d.id;
+  top.append(cs);
+  card.append(top);
+
+  card.append(el("p", "statement", d.statement));
+
+  const flag = el("div", "flag");
+  flag.append(el("span", "flag-label", "Flag — your words"));
+  flag.append(el("p", null, d.flag));
+  card.append(flag);
+
+  card.append(labelled("What's the real concern?"));
+  const ta = el("textarea");
+  ta.id = "concern-" + d.id;
+  ta.placeholder = "The reason behind the flag — what would go wrong if the sentence were just tidied up.";
+  ta.addEventListener("input", () => queueSave(d.id, { concern: ta.value }));
+  card.append(ta);
+
+  card.append(labelled("Disposition"));
+  const seg = el("div", "seg");
+  seg.id = "seg-" + d.id;
+  DISPOSITIONS.forEach(o => {
+    const b = el("button", null, o.label);
+    b.type = "button";
+    b.dataset.v = o.v;
+    b.setAttribute("aria-pressed", "false");
+    b.addEventListener("click", () => {
+      const cur = state[d.id] && state[d.id].disposition;
+      const next = cur === o.v ? null : o.v;
+      setDisposition(d.id, next);
+      queueSave(d.id, { disposition: next }, true);
+    });
+    seg.append(b);
+  });
+  card.append(seg);
+  return card;
+}
+
+function renderBand(d) {
+  const card = el("div", "card");
+  card.id = "card-" + d.id;
+  const top = el("div", "card-top");
+  top.append(el("span", "id", d.id));
+  if (d.meta) top.append(el("span", "meta", d.meta));
+  const cs = el("div", "card-state");
+  cs.id = "state-" + d.id;
+  top.append(cs);
+  card.append(top);
+  card.append(el("p", "statement", d.statement));
+  if (d.note) card.append(el("p", "note", d.note));
+
+  card.append(labelled("Band"));
+  const band = el("div", "band");
+  band.id = "band-" + d.id;
+  BANDS.forEach(v => {
+    const b = el("button", null, v);
+    b.type = "button";
+    b.dataset.v = v;
+    b.setAttribute("aria-pressed", "false");
+    b.addEventListener("click", () => {
+      const cur = state[d.id] && state[d.id].band;
+      const next = cur === v ? null : v;
+      setBand(d.id, next);
+      queueSave(d.id, { band: next }, true);
+    });
+    band.append(b);
+  });
+  card.append(band);
+  return card;
+}
+
+function renderDone(d) {
+  const card = el("div", "card settled");
+  const top = el("div", "card-top");
+  top.append(el("span", "id", d.id));
+  const cs = el("div", "card-state saved");
+  cs.append(el("span", "tick"), document.createTextNode("done"));
+  top.append(cs);
+  card.append(top);
+  card.append(el("p", "statement", d.statement));
+  return card;
+}
+
+function setDisposition(id, v) {
+  state[id] = Object.assign({}, state[id], { disposition: v });
+  const seg = document.getElementById("seg-" + id);
+  if (seg) [...seg.children].forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === v)));
+  refreshCardState(id, "flag");
+  updateProgress();
+}
+function setBand(id, v) {
+  state[id] = Object.assign({}, state[id], { band: v });
+  const band = document.getElementById("band-" + id);
+  if (band) [...band.children].forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === v)));
+  refreshCardState(id, "band");
+  updateProgress();
+}
+function setConcern(id, text) {
+  state[id] = Object.assign({}, state[id], { concern: text });
+  const ta = document.getElementById("concern-" + id);
+  if (ta && ta.value !== text && document.activeElement !== ta) ta.value = text;
+  refreshCardState(id, "flag");
+}
+
+function refreshCardState(id, kind) {
+  const cs = document.getElementById("state-" + id);
+  if (!cs) return;
+  const s = state[id] || {};
+  let done = false, txt = "";
+  if (kind === "flag") { done = !!s.disposition; txt = done ? "captured" : (s.concern ? "in progress" : ""); }
+  else { done = !!s.band; txt = done ? "band set" : ""; }
+  cs.className = "card-state" + (done ? " saved" : "");
+  cs.textContent = "";
+  if (done) cs.append(el("span", "tick"));
+  if (txt) cs.append(document.createTextNode(txt));
+}
+
+function updateProgress() {
+  const f = FLAGGED.filter(d => state[d.id] && state[d.id].disposition).length;
+  const b = TO_BAND.filter(d => state[d.id] && state[d.id].band).length;
+  document.getElementById("m-flag").textContent = f + "/" + FLAGGED.length;
+  document.getElementById("m-band").textContent = b + "/" + TO_BAND.length;
+}
+
+function queueSave(id, patch, now) {
+  state[id] = Object.assign({}, state[id], patch);
+  if (!db) return;
+  clearTimeout(saveTimers[id]);
+  const doWrite = () => {
+    db.doc("review/" + id).set({
+      concern: state[id].concern || "",
+      disposition: state[id].disposition || "",
+      band: state[id].band || "",
+      updatedAt: new Date().toISOString(),
+    }).catch(() => {});
+  };
+  if (now) doWrite();
+  else saveTimers[id] = setTimeout(doWrite, 700);
+}
+
+function setStatus(kind, text) {
+  const dot = document.getElementById("statusdot");
+  dot.className = "dot" + (kind === "live" ? " live" : kind === "off" ? " off" : "");
+  document.getElementById("statustext").textContent = text;
+}
+
+// ---- build DOM ----
+FLAGGED.forEach(d => document.getElementById("g-flag").append(renderFlagged(d)));
+TO_BAND.forEach(d => document.getElementById("g-band").append(renderBand(d)));
+DONE.forEach(d => document.getElementById("g-done").append(renderDone(d)));
+if (!FLAGGED.length) document.getElementById("g-flag").hidden = true;
+if (!TO_BAND.length) document.getElementById("g-band").hidden = true;
+if (!DONE.length) document.getElementById("g-done").hidden = true;
+updateProgress();
+
+// ---- wire db ----
+(async () => {
+  try {
+    db = (typeof claude !== "undefined" && claude.use) ? await claude.use("db") : null;
+  } catch (e) { db = null; }
+
+  document.getElementById("progress").hidden = false;
+
+  if (!db) {
+    setStatus("off", "not saving — tell Claude to confirm the page is published, then reload");
+    return;
+  }
+  setStatus("live", "notes save automatically");
+
+  try {
+    db.collection("review").onSnapshot(snap => {
+      snap.docs.forEach(doc => {
+        const data = doc.data() || {};
+        const id = doc.id;
+        state[id] = {
+          concern: data.concern || "",
+          disposition: data.disposition || "",
+          band: data.band || "",
+        };
+        if (document.getElementById("concern-" + id)) setConcern(id, state[id].concern);
+        if (document.getElementById("seg-" + id)) setDisposition(id, state[id].disposition || null);
+        if (document.getElementById("band-" + id)) setBand(id, state[id].band || null);
+      });
+      updateProgress();
+    }, () => setStatus("off", "save connection dropped — recent edits may not be stored"));
+  } catch (e) {
+    setStatus("off", "not saving — " + (e && e.message ? e.message : "unavailable"));
+  }
+})();
+</script>
+</body>
+</html>
