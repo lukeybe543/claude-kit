@@ -4,29 +4,40 @@ This guide explains how to bootstrap new projects with claude-kit's templates, h
 
 ## Quick Start
 
-```bash
-# Clone claude-kit into ~/.claude (machine-global setup)
-git clone https://github.com/lukeybe543/claude-kit ~/.claude/claude-kit
-python3 ~/.claude/claude-kit/install.py
+claude-kit doesn't need to live anywhere permanent. `install.py` and
+`adopt.py` **copy** files into `~/.claude/` and into your project — once
+they've run, nothing points back at the checkout you ran them from. Clone it
+wherever's convenient, run the two scripts, delete the clone:
 
-# Bootstrap a new project
-/home/user/path/to/claude-kit/bootstrap.sh /path/to/new/project
-cd /path/to/new/project
-git init
+```bash
+git clone --depth 1 https://github.com/lukeybe543/claude-kit /tmp/claude-kit
+/tmp/claude-kit/bootstrap.sh /path/to/new/project
+rm -rf /tmp/claude-kit
 ```
+
+`bootstrap.sh` is just `install.py` (writes `~/.claude/hooks`, `~/.claude/skills`,
+`~/.claude/agents`, `~/.claude/CLAUDE.md` — once per machine, idempotent) then
+`adopt.py <project>` (scaffolds the project's docs — create-only, idempotent)
+run back to back. To update later, re-clone (or keep a checkout anywhere and
+`git pull` it) and run the same two scripts again.
+
+If you'd rather keep a permanent local checkout to track your own edits to
+claude-kit itself (see "Sharing Changes Back," below), that's fine too —
+`~/.claude/claude-kit` is a reasonable spot, but it's a convenience, not a
+requirement. Nothing about how hooks or skills work depends on where the
+checkout lives.
 
 ## What the Bootstrap Does
 
-The `bootstrap.sh` script sets up a new project with:
+`bootstrap.sh` (via `install.py` then `adopt.py`) sets up:
 
-### 1. `.claude/` Directory
+### 1. `.claude/` Directory (in the project, real files)
 ```
 .claude/
 ├── notify.json       # Project-specific hook configs (merged with global)
 ├── settings.json     # Project-specific permission baseline
-├── commands/
-│   └── check.md      # Template for your project's verification script
-└── kit → ../../claude-kit  # Symlink to claude-kit (relative path)
+└── commands/
+    └── check.md      # Template for your project's verification script
 ```
 
 ### 2. Master Docs (root level, the source of truth)
@@ -61,12 +72,12 @@ A stub that references the global rules and fills in project-specific info —
 ### Machine Setup (once per machine)
 
 ```bash
-# Install machine-global hooks, skills, and agents
-git clone https://github.com/lukeybe543/claude-kit ~/.claude/claude-kit
-python3 ~/.claude/claude-kit/install.py
+# Any location works -- install.py copies into ~/.claude and doesn't care
+# where the checkout lives afterward.
+git clone --depth 1 https://github.com/lukeybe543/claude-kit /tmp/claude-kit
+python3 /tmp/claude-kit/install.py
 
-# Update any time:
-git -C ~/.claude/claude-kit pull && python3 ~/.claude/claude-kit/install.py
+# Update any time: re-clone and re-run, or keep the checkout and git pull it.
 ```
 
 This gives every project access to:
@@ -77,10 +88,8 @@ This gives every project access to:
 ### New Project
 
 ```bash
-# Using the bootstrap script:
-~/.claude/claude-kit/bootstrap.sh /path/to/myproject
-
-# Then:
+bootstrap.sh /path/to/myproject   # or: python3 adopt.py /path/to/myproject
+                                    # (bootstrap.sh also runs install.py first)
 cd /path/to/myproject
 git init
 # Fill in design.md and plan.md first — everything else derives from them
@@ -88,13 +97,6 @@ git init
 # Point .claude/commands/check.md at your project's test/lint commands
 ```
 
-**Or** use adopt.py from any existing project:
-
-```bash
-python3 ~/.claude/claude-kit/adopt.py /path/to/myproject
-```
-
-Both do the same scaffolding; bootstrap.sh also creates the `.claude/kit` symlink.
 Nothing to merge here — the target is empty, so every file is freshly created.
 
 ### Existing Project (like before94)
@@ -127,19 +129,23 @@ The actual migration work, in order:
 
 ## Sharing Changes Back to claude-kit
 
-After improving claude-kit in your projects:
+This is the one workflow where a throwaway clone doesn't fit — you need a
+checkout with its own git history to commit and push from. Keep one
+somewhere durable (`~/.claude/claude-kit` is fine) instead of `/tmp`.
+
+After improving a hook, skill, or template while working in a project:
 
 ```bash
-# From your project:
-git diff .claude/
-
-# From claude-kit:
-cp -r /path/to/project/.claude/notify.json ~/.claude/claude-kit/project-template/.claude/
-git -C ~/.claude/claude-kit commit -am "Update from project X"
+# e.g. you tuned .claude/notify.json's verify command in before94 and want
+# that as the new project-template default:
+cp before94/.claude/notify.json ~/.claude/claude-kit/project-template/.claude/
+git -C ~/.claude/claude-kit commit -am "Tune default verify command"
 git -C ~/.claude/claude-kit push
 ```
 
-Or use `before94`'s `.claude/` copy as the true source if you're still maintaining it.
+A project should no longer carry its own copy of `hooks/` or `skills/` once
+migrated (see "Existing Project," above) — the global `~/.claude/hooks` /
+`~/.claude/skills`, updated by re-running `install.py`, is the only copy.
 
 ## CLAUDE.md at Multiple Levels
 
@@ -252,28 +258,19 @@ commands/
 
 ## Troubleshooting
 
-### `.claude/kit` symlink is broken
-The bootstrap script creates a relative symlink. If it breaks:
+### Hooks don't fire in a new project
+Hooks are wired into `~/.claude/settings.json` by `install.py`, with an
+absolute path to `~/.claude/hooks/notify.py` baked in — nothing project-side
+to configure. If they're silent, re-run `install.py` and open `/hooks` once
+in a running session so Claude Code reloads settings (its own final line
+says so).
+
+### A project file already exists and differs from the template
+`adopt.py` (and `bootstrap.sh`, which calls it) never overwrites — it prints
+a SKIPPED line with a diff command instead:
 
 ```bash
-cd /path/to/project
-rm .claude/kit
-ln -s ../../path/to/claude-kit .claude/kit
+diff /path/to/project/CLAUDE.md /path/to/claude-kit-checkout/project-template/CLAUDE.md
 ```
 
-### Hooks don't work in new project
-Hooks are machine-global. After boostrapping, they're available everywhere:
-
-```bash
-# From your workstation ~/.claude/hooks/notify.py
-# Or ~/.claude/skills for doc skills
-```
-
-### CLAUDE.md already exists and differs
-bootstrap.sh will warn and print a diff. Merge by hand:
-
-```bash
-diff /path/to/project/CLAUDE.md ~/.claude/claude-kit/project-template/CLAUDE.md
-```
-
-Then edit and keep what you need.
+Merge by hand, keeping what the project actually needs.
