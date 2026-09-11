@@ -1,6 +1,7 @@
 """Install (or update) claude-kit into this machine's ~/.claude.
 
-    python3 install.py              # install / update from this checkout
+    python3 install.py              # install / update from this checkout (copies)
+    python3 install.py --link       # symlink instead of copy -- see below
     python3 install.py --pull       # git pull this checkout first, then install
     python3 install.py --desktop    # also set up the desk-listener systemd service
 
@@ -9,6 +10,16 @@ land in ~/.claude and apply to every project and every session. Re-run any time
 to pick up changes — it is idempotent and never overwrites a file you are meant
 to edit (~/.claude/CLAUDE.md, ~/.claude/hooks/notify.json). Per-project
 scaffolding is a separate script, adopt.py.
+
+--link makes ~/.claude/hooks, ~/.claude/skills and ~/.claude/agents symlinks
+into this checkout instead of copies of it. A copy install means an edit made
+against the live ~/.claude files and an edit made in this checkout are two
+different files that only agree right after the next install run -- --link
+makes them the same file, so a hook edited in any session is live everywhere
+immediately, and shipping it is just `git commit && git push` from here. Any
+machine-specific file a prior copy-install left behind (notify.json,
+notify.local.json, hooks/state/) is folded into the checkout, gitignored
+there, before the symlink replaces the copy.
 """
 
 import json
@@ -38,10 +49,34 @@ def _copy_tree(src, dst, report, overwrite=True):
             report.append("kept    " + str(target.relative_to(Path.home())))
 
 
-def _install_files(report):
-    _copy_tree(HERE / "hooks", CLAUDE / "hooks", report)
+def _link_tree(src, dst, report):
+    """Symlink dst -> src, folding in any machine-specific file a prior
+    copy-install left in dst that src does not already have."""
+    if dst.is_symlink():
+        if dst.resolve() == src.resolve():
+            report.append("kept    " + str(dst.relative_to(Path.home())) + " (already linked)")
+            return
+        dst.unlink()
+    elif dst.exists():
+        for item in dst.rglob("*"):
+            if item.is_dir() or item.name == "__pycache__":
+                continue
+            target = src / item.relative_to(dst)
+            if not target.exists():
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.move(str(item), str(target))
+                report.append("kept    " + str(target.relative_to(Path.home()))
+                              + " (moved from the copy-install)")
+        shutil.rmtree(dst)
+    dst.symlink_to(src, target_is_directory=True)
+    report.append("linked  " + str(dst.relative_to(Path.home())) + " -> " + str(src))
+
+
+def _install_files(report, link=False):
+    tree = _link_tree if link else _copy_tree
+    tree(HERE / "hooks", CLAUDE / "hooks", report)
     for group in ("skills", "agents"):
-        _copy_tree(HERE / group, CLAUDE / group, report)
+        tree(HERE / group, CLAUDE / group, report)
     example = CLAUDE / "hooks" / "notify.json.example"
     default = CLAUDE / "hooks" / "notify.json"
     if example.exists() and not default.exists():
@@ -117,16 +152,22 @@ def main():
         subprocess.run(["git", "-C", str(HERE), "pull", "--ff-only"], check=False)
 
     report = []
-    _install_files(report)
+    _install_files(report, link="--link" in flags)
     _install_claude_md(report)
     _merge_settings(report)
     if "--desktop" in flags:
         _install_desktop(report)
 
     print("\n".join(report))
-    print("\nDone. Open /hooks in a running session once so Claude Code reloads "
-          "settings.\nUpdate later with:  git -C " + str(HERE)
-          + " pull && python3 " + str(HERE / "install.py"))
+    if "--link" in flags:
+        print("\nDone. Open /hooks in a running session once so Claude Code reloads "
+              "settings.\n~/.claude/hooks, skills and agents are now this checkout -- "
+              "edit here and every session sees it immediately.\nShip a change with: "
+              "git -C " + str(HERE) + " commit && git -C " + str(HERE) + " push")
+    else:
+        print("\nDone. Open /hooks in a running session once so Claude Code reloads "
+              "settings.\nUpdate later with:  git -C " + str(HERE)
+              + " pull && python3 " + str(HERE / "install.py"))
     return 0
 
 

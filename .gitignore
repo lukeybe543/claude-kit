@@ -1,6 +1,8 @@
 __pycache__/
 *.pyc
 
-# Scratch state and per-machine hook config, when the kit is used on itself.
-.claude/state/
-.claude/hooks/notify.local.json
+# Scratch state and per-machine hook config -- real on a machine that installed
+# with `install.py --link`, where this checkout's hooks/ *is* ~/.claude/hooks.
+hooks/state/
+hooks/notify.json
+hooks/notify.local.json
