@@ -7,9 +7,10 @@
 #
 # This script:
 # 1. Copies .claude/ (notify.json, settings.json, hooks reference)
-# 2. Copies docs/ templates (charter.md, decisions.md, glossary.md)
-# 3. Copies CLAUDE.md stub
-# 4. Creates a symlink to claude-kit for easy hook/skill access
+# 2. Copies the master docs (design.md, plan.md, README.md)
+# 3. Copies docs/ derived-doc templates (charter.md, decisions.md, glossary.md)
+# 4. Copies CLAUDE.md stub
+# 5. Creates a symlink to claude-kit for easy hook/skill access
 # All paths remain relative so the project works anywhere.
 
 set -eu
@@ -65,15 +66,18 @@ mkdir -p "$TARGET/.claude"
 copy_file "$TPL/.claude/notify.json" "$TARGET/.claude/notify.json"
 copy_file "$TPL/.claude/settings.json" "$TARGET/.claude/settings.json"
 
-# Copy docs templates
+# Copy master docs + CLAUDE.md stub
+echo "Setting up project files"
+copy_file "$TPL/CLAUDE.md" "$TARGET/CLAUDE.md"
+for doc in design.md plan.md README.md; do
+    copy_file "$TPL/$doc" "$TARGET/$doc"
+done
+
+# Copy derived-doc templates
 echo "Setting up docs/"
 for doc in charter.md decisions.md glossary.md; do
     copy_file "$TPL/docs/$doc" "$TARGET/docs/$doc"
 done
-
-# Copy CLAUDE.md stub
-echo "Setting up project files"
-copy_file "$TPL/CLAUDE.md" "$TARGET/CLAUDE.md"
 
 # Create symlink to claude-kit (for hook/skill access)
 # This uses relative paths so it works regardless of where the project lives
@@ -101,9 +105,10 @@ echo ""
 echo "✓ Bootstrap complete!"
 echo ""
 echo "Next steps:"
-echo "  1. Edit $TARGET/CLAUDE.md with project-specific rules"
-echo "  2. Fill in docs/charter.md, docs/decisions.md, docs/glossary.md"
-echo "  3. Update .claude/commands/check.md to point to your test/lint commands"
+echo "  1. Fill in design.md (architecture, source of truth) and plan.md (sequencing)"
+echo "  2. Edit $TARGET/CLAUDE.md with project-specific rules — see design.md/plan.md pointer"
+echo "  3. Fill in docs/charter.md, docs/decisions.md, docs/glossary.md (or run /charter)"
+echo "  4. Update .claude/commands/check.md to point to your test/lint commands"
 echo ""
 echo "To use hooks & skills:"
 echo "  - Hooks: ln -s .claude/kit/hooks/notify.py ~/.claude/hooks/notify.py (machine-global)"

@@ -2,9 +2,10 @@
 
     python3 adopt.py /path/to/project
 
-Writes the decision-register / charter / glossary templates, a project CLAUDE.md
-stub, and an optional per-project notify.json. It **only ever creates files** —
-an existing CLAUDE.md, or an existing docs file, is left untouched and the diff
+Writes design.md / plan.md / README.md (the master + summary docs), the
+decision-register / charter / glossary templates, a project CLAUDE.md stub,
+and an optional per-project notify.json. It **only ever creates files** — an
+existing CLAUDE.md, or an existing docs file, is left untouched and the diff
 is printed for the owner to merge by hand. The hooks and skills are machine-
 global (install.py); this does not touch them.
 
@@ -53,6 +54,8 @@ def main():
             "<date>": datetime.date.today().isoformat()}
     report = []
     _place(TPL / "CLAUDE.md", project / "CLAUDE.md", subs, report)
+    for doc in ("design.md", "plan.md", "README.md"):
+        _place(TPL / doc, project / doc, subs, report)
     for doc in ("charter.md", "decisions.md", "glossary.md"):
         _place(TPL / "docs" / doc, project / "docs" / doc, subs, report)
     _place(TPL / ".claude" / "notify.json", project / ".claude" / "notify.json", subs, report)
