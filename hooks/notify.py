@@ -19,6 +19,7 @@ able to stop a session.
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -51,6 +52,14 @@ ROUND_GAP_SECONDS = 60
 # A turn shorter than this was never long enough to lose someone's attention;
 # alerting on it would only train the ear to ignore the sound.
 QUIET_TURN_SECONDS = 45
+
+# Ceilings on the project's own lint/verify commands, kept under the matching
+# hook's settings.json timeout (60s / 300s) so a stuck command ends in a clean
+# timeout message instead of Claude Code hard-killing the hook -- and, for
+# commit-gate, ends in a bounded delay on every commit rather than an
+# unbounded one on a project whose verify command hangs.
+LINT_TIMEOUT_SECONDS = 45
+VERIFY_TIMEOUT_SECONDS = 240
 
 
 # ---------------------------------------------------------------------------
@@ -376,7 +385,13 @@ def after_edit():
 
     filled = [sys.executable if a == "{python}" else a.replace("{file}", path)
               for a in command]
-    lint = subprocess.run(filled, cwd=_project_dir(), capture_output=True, text=True, check=False)
+    try:
+        lint = subprocess.run(filled, cwd=_project_dir(), capture_output=True, text=True,
+                               check=False, timeout=LINT_TIMEOUT_SECONDS)
+    except subprocess.TimeoutExpired:
+        print("lint timed out after " + str(LINT_TIMEOUT_SECONDS) + "s: " + " ".join(filled),
+              file=sys.stderr)
+        return 2
     if lint.returncode:
         print(lint.stdout or lint.stderr, file=sys.stderr)
         return 2  # exit 2 feeds stderr back to Claude as a blocking error
@@ -418,11 +433,18 @@ def _run_verify():
     if not (Path(filled[0]).is_file() or shutil.which(filled[0])):
         return None
 
-    run = subprocess.run(filled, cwd=_project_dir(), capture_output=True, text=True, check=False)
-    output = run.stdout + run.stderr
+    try:
+        run = subprocess.run(filled, cwd=_project_dir(), capture_output=True, text=True,
+                              check=False, timeout=VERIFY_TIMEOUT_SECONDS)
+        output = run.stdout + run.stderr
+        passed = run.returncode == 0
+    except subprocess.TimeoutExpired as timeout:
+        output = ((timeout.stdout or "") + (timeout.stderr or "")
+                  + "\n[verify timed out after " + str(VERIFY_TIMEOUT_SECONDS) + "s]")
+        passed = False
     STATE.mkdir(parents=True, exist_ok=True)
     _flag("last-verify.log").write_text(output)
-    return run.returncode == 0, output
+    return passed, output
 
 
 def turn_end():
@@ -455,8 +477,12 @@ def turn_end():
     return 0
 
 
-_COMMIT = re.compile(r"\bgit\b.*\bcommit\b")
 _SEGMENTS = re.compile(r"&&|\|\||;|\|")
+
+# git global flags that take their value as a separate following token (as
+# opposed to `--git-dir=x`, which is self-contained) -- these have to be
+# walked past, not mistaken for the subcommand.
+_GIT_VALUE_FLAGS = {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path"}
 
 
 def _is_commit(command):
@@ -464,10 +490,29 @@ def _is_commit(command):
 
     Looking for the literal "git commit" misses `git -c user.name=... commit`,
     which is how a commit is usually made from a script; looking for both words
-    anywhere matches `echo commit && git log`. Split on shell separators and
-    require both words, in that order, inside a single segment.
+    anywhere in a segment matches `git log --grep=commit` or `git diff --
+    commit.py`, which run verification (and can hang on it) despite never
+    committing anything. Split on shell separators, tokenize each segment, and
+    walk past git's global flags to check whether the actual subcommand is
+    "commit".
     """
-    return any(_COMMIT.search(part) for part in _SEGMENTS.split(command))
+    for part in _SEGMENTS.split(command):
+        try:
+            tokens = shlex.split(part)
+        except ValueError:
+            continue  # unbalanced quoting (e.g. a message split across a separator)
+        for i, token in enumerate(tokens):
+            if token != "git" and not token.endswith("/git"):
+                continue
+            rest = tokens[i + 1:]
+            j = 0
+            while j < len(rest) and rest[j].startswith("-"):
+                if rest[j] in _GIT_VALUE_FLAGS and "=" not in rest[j]:
+                    j += 1  # skip this flag's separate value too
+                j += 1
+            if j < len(rest) and rest[j] == "commit":
+                return True
+    return False
 
 
 def commit_gate():
@@ -544,7 +589,8 @@ def selftest():
                "git -c user.name=a -c user.email=b commit -q -F -",
                "git add -A && git -c user.name=a commit -m x"]
     not_commits = ["git log --oneline", "echo commit && git log", "ls -la",
-                   "python notify.py commit-gate"]
+                   "python notify.py commit-gate", "git log --grep=commit",
+                   "git diff -- commit.py", "git branch commit-fix"]
     for command in commits:
         assert _is_commit(command), "should gate: " + command
     for command in not_commits:
