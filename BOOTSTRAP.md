@@ -261,9 +261,10 @@ commands/
 ### Hooks don't fire in a new project
 Hooks are wired into `~/.claude/settings.json` by `install.py`, with an
 absolute path to `~/.claude/hooks/notify.py` baked in — nothing project-side
-to configure. If they're silent, re-run `install.py` and open `/hooks` once
-in a running session so Claude Code reloads settings (its own final line
-says so).
+to configure. Hook config is cached for a session's lifetime; there is no
+mid-session reload, and `/hooks` is read-only — it does not trigger one
+either. **Restart the Claude Code session** after running `install.py` for
+the first time or after settings change.
 
 ### A project file already exists and differs from the template
 `adopt.py` (and `bootstrap.sh`, which calls it) never overwrites — it prints
