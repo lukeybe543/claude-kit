@@ -87,7 +87,10 @@ def _install_files(report, link=False):
 
 def _install_claude_md(report):
     src, dst = HERE / "global" / "CLAUDE.md", CLAUDE / "CLAUDE.md"
-    if not dst.exists():
+    # A file that exists but is empty/whitespace-only (Claude Code itself
+    # creates one on first launch) has no content worth preserving -- treat
+    # it the same as absent rather than silently refusing to write.
+    if not dst.exists() or not dst.read_text().strip():
         shutil.copy2(src, dst)
         report.append("wrote   .claude/CLAUDE.md")
         return
@@ -160,13 +163,18 @@ def main():
 
     print("\n".join(report))
     if "--link" in flags:
-        print("\nDone. Open /hooks in a running session once so Claude Code reloads "
-              "settings.\n~/.claude/hooks, skills and agents are now this checkout -- "
-              "edit here and every session sees it immediately.\nShip a change with: "
+        print("\nDone. Restart any running Claude Code session for the settings "
+              "changes to take effect -- hook config is cached for a session's "
+              "lifetime, and there is no mid-session reload (not even /hooks).\n"
+              "~/.claude/hooks, skills and agents are now this checkout -- "
+              "edit here and every session sees it immediately after a restart.\n"
+              "Ship a change with: "
               "git -C " + str(HERE) + " commit && git -C " + str(HERE) + " push")
     else:
-        print("\nDone. Open /hooks in a running session once so Claude Code reloads "
-              "settings.\nUpdate later with:  git -C " + str(HERE)
+        print("\nDone. Restart any running Claude Code session for the settings "
+              "changes to take effect -- hook config is cached for a session's "
+              "lifetime, and there is no mid-session reload (not even /hooks).\n"
+              "Update later with:  git -C " + str(HERE)
               + " pull && python3 " + str(HERE / "install.py"))
     return 0
 
