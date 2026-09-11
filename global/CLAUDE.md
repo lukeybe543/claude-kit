@@ -96,6 +96,16 @@ blocker), `revisitable` (actively look to improve it) — and a `Flag` raises a
 row on sight whatever its Band. Claude only ever *proposes* a Band. Full rules
 in `docs/charter.md`; the method itself is in claude-kit's `METHOD.md`.
 
+A sentence in a design or plan document is **not** automatically a decision
+with a Band — only a row in `docs/decisions.md` carries one. The most common
+source of a false firm rule is emphasis in conversation ("never do X") that
+gets written into the design doc as flat prose; the scope moves on, the
+sentence stays, and it is now read as binding. Before treating design/plan
+prose as a hard constraint, check whether it has a matching decision row — if
+not, it is probably a description or a remembered emphasis, not policy: ask
+rather than build around it. `/audit-absolutes` finds these before they
+calcify; run it after any heavy design session, not just at project start.
+
 ## 8. How the work runs
 
 - **Replies stay short.** Length is a context cost, not just a courtesy — every
