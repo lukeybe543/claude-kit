@@ -16,15 +16,10 @@ task, use judgement.
 - If a simpler approach exists, say so. Push back when warranted.
 - If something is unclear, stop. Name what's confusing. Ask.
 
-## 2. Simplicity First (Handmade Ethos)
+## 2. Simplicity First
 
-**Minimum code that solves the problem. Nothing speculative. Semantic compression.**
+**Minimum code that solves the problem. Nothing speculative.**
 
-- Write straight-line, procedural code first. Extract functions or classes
-  only when explicit duplication hinders readability.
-- No "Enterprise" Python: discard deep inheritance, ABCs, complex decorators,
-  and design patterns (factories, dependency injection). Keep the call stack
-  shallow and obvious.
 - No features beyond what was asked.
 - No abstractions for single-use code.
 - No "flexibility" or "configurability" that wasn't requested.
@@ -33,27 +28,7 @@ task, use judgement.
 
 Ask: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
 
-## 3. Data-Oriented Python & Execution
-
-**Prioritize data transformations, explicit control flow, and memory sympathy.**
-
-- **Separate data from logic:** Prefer basic structures (`dict`, `list`,
-  `tuple`) or plain `@dataclass(slots=True)` over heavy, stateful object
-  instances with attached methods.
-- **GC Sympathy:** Object creation in Python is slow. In hot loops, minimize
-  object churn. Pre-allocate lists when the final size is known (e.g.,
-  `buffer = [None] * size`) rather than using `.append()`.
-- **Batch Processing:** Write functions that process iterables of data in
-  bulk. If processing large numerical datasets, drop down to `numpy` arrays
-  (Structure-of-Arrays) rather than iterating over lists of Python objects
-  (Array-of-Structures).
-- **Explicit over Implicit:** Avoid metaclasses, `@property` setters, and
-  heavy magic methods (`__getattr__`, `__setattr__`). A variable access
-  should just be a variable access.
-- **Deterministic Execution:** Keep state centralized and easily inspectable.
-  Minimize side effects so bugs are perfectly reproducible in a REPL.
-
-## 4. Surgical Changes
+## 3. Surgical Changes
 
 **Touch only what you must. Clean up only your own mess.**
 
@@ -66,7 +41,7 @@ Ask: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
 
 The test: every changed line traces directly to the request.
 
-## 5. Goal-Driven Execution
+## 4. Goal-Driven Execution
 
 **Name the check before you start, not after.**
 
@@ -76,26 +51,25 @@ reproduces it, then make it pass". For multi-step work, state the plan as
 `step → verify: check`. Run the check when you finish and report its output —
 "done" without the verification result is not done.
 
-## 6. Established practice is the default
+## 5. Established practice is the default
 
 A decision that departs from established engineering best practice must **record
 the departure and its justification** (in the project's decision register if it
-has one — see §8). **Flag an undeclared departure on sight**, naming the
+has one — see §7). **Flag an undeclared departure on sight**, naming the
 standard, the departure, and the trade-off, so the owner can decide knowingly.
 
 Bounded (Casey Muratori): "industry standard" is not a mandate to cargo-cult
-every fashionable practice or object-oriented bloat. A 250-line bespoke,
-procedural script that does the job, uses basic data structures, and is fully
-understood is fine; don't replace it with a heavyweight framework for being
-conventional. Don't manufacture a "standard" to object. Push back *hard* only
-where the departure is from something near-universal — no version control, no
-CI, untested destructive automation, plaintext secrets — and use judgement
+every fashionable practice. A 250-line bespoke script that does the job and is
+fully understood is fine; don't replace it with a heavyweight framework for
+being conventional. Don't manufacture a "standard" to object. Push back *hard*
+only where the departure is from something near-universal — no version control,
+no CI, untested destructive automation, plaintext secrets — and use judgement
 elsewhere.
 
 **No yes-man.** Agreeing with the owner when you have a real reservation is a
 failure, not politeness.
 
-## 7. Review marks in a document
+## 6. Review marks in a document
 
 The owner reviews a document by prepending a **tag word** on its own line,
 directly above the block that is wrong — not by pasting it into chat. Recognise
@@ -112,7 +86,7 @@ Text after the mark is a note; marks stack. Act only on marked blocks, delete
 each mark once resolved, report mark-by-mark, hand back anything needing a
 decision with the mark left in place. `/flags <file>` runs the full pass.
 
-## 8. If the project has a decision register
+## 7. If the project has a decision register
 
 When `docs/decisions.md` and `docs/charter.md` exist, read them before proposing
 anything and before citing a past decision as a constraint. In short: each
@@ -132,7 +106,7 @@ not, it is probably a description or a remembered emphasis, not policy: ask
 rather than build around it. `/audit-absolutes` finds these before they
 calcify; run it after any heavy design session, not just at project start.
 
-## 9. How the work runs
+## 8. How the work runs
 
 - **Replies stay short.** Length is a context cost, not just a courtesy — every
   token in the reply is a token less of working room next turn.
